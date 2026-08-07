@@ -47,7 +47,7 @@ export const CategoriesPage: React.FC = () => {
             <div className="relative z-10 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-sky-300 bg-sky-950/80 px-3 py-1 rounded-full border border-sky-800/40">
-                  {Math.max(cat.count, wallpapers.filter((w) => w.category === cat.name).length)}+ Wallpapers
+                  {wallpapers.filter((w) => w.category === cat.name).length || cat.count} Wallpapers
                 </span>
                 <div className="w-8 h-8 rounded-full bg-slate-900/80 flex items-center justify-center text-slate-300 group-hover:text-sky-400 group-hover:bg-sky-500/20 transition-colors">
                   <ArrowRight className="w-4 h-4" />
