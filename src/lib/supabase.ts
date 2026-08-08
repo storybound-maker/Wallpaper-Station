@@ -157,7 +157,7 @@ export async function uploadWallpaperFileAndSave({
   const filePath = `uploads/${fileName}`;
 
   const { error: uploadError } = await client.storage
-    .from('wallpapers')
+    .from('Wallpaper Station')
     .upload(filePath, file, {
       cacheControl: '3600',
       upsert: false
@@ -170,7 +170,7 @@ export async function uploadWallpaperFileAndSave({
 
   // 2. Get Public URL
   const { data: publicUrlData } = client.storage
-    .from('wallpapers')
+    .from('Wallpaper Station')
     .getPublicUrl(filePath);
 
   const publicUrl = publicUrlData.publicUrl;
