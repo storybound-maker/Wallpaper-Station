@@ -10,17 +10,9 @@ import {
  * ============================================================
  * SUPABASE CONFIGURATION
  * ============================================================
- *
- * This is a Vite app, so the environment variables MUST use:
- *
- * VITE_SUPABASE_URL
- * VITE_SUPABASE_ANON_KEY
- *
- * The Vercel variables should therefore have those exact names.
  */
 
 export const getSupabaseConfig = () => {
-  // Optional local override from the Admin panel.
   const customUrl =
     typeof window !== 'undefined'
       ? localStorage.getItem('ws_supabase_url')
@@ -47,17 +39,14 @@ export const getSupabaseConfig = () => {
   };
 };
 
-/**
- * Check whether Supabase credentials are available.
- */
 export const isSupabaseConfigured = (): boolean => {
   const { url, key } = getSupabaseConfig();
 
   return Boolean(
     url &&
-      key &&
-      url.startsWith('https://') &&
-      key.length > 20
+    key &&
+    url.startsWith('https://') &&
+    key.length > 20
   );
 };
 
@@ -91,23 +80,12 @@ export const getSupabaseClient = (): SupabaseClient | null => {
   return clientInstance;
 };
 
-/**
- * Reset cached Supabase client.
- * Used when credentials are changed from the Admin panel.
- */
 export const resetSupabaseClientInstance = () => {
   clientInstance = null;
 };
 
-/**
- * Backwards-compatible exported client.
- *
- * IMPORTANT:
- * Because environment variables are loaded when the module
- * starts, functions below use getSupabaseClient() instead of
- * relying on this constant.
- */
-export const supabase: SupabaseClient | null = getSupabaseClient();
+export const supabase: SupabaseClient | null =
+  getSupabaseClient();
 
 /**
  * ============================================================
@@ -127,8 +105,6 @@ export function mapDbRowToWallpaper(row: any): Wallpaper {
       row.description ||
       '',
 
-    // New database structure uses "url".
-    // image_url is kept as a fallback for older rows.
     url:
       row.url ||
       row.image_url ||
@@ -167,7 +143,11 @@ export function mapDbRowToWallpaper(row: any): Wallpaper {
         ? row.color_hex
         : Array.isArray(row.colorHex)
         ? row.colorHex
-        : ['#0B1220', '#38BDF8', '#818CF8'],
+        : [
+            '#0B1220',
+            '#38BDF8',
+            '#818CF8',
+          ],
 
     colorName:
       row.color_name ||
@@ -177,7 +157,9 @@ export function mapDbRowToWallpaper(row: any): Wallpaper {
     uploadDate:
       row.upload_date ||
       row.uploadDate ||
-      new Date().toISOString().split('T')[0],
+      new Date()
+        .toISOString()
+        .split('T')[0],
 
     views:
       Number(row.views || 0),
@@ -194,7 +176,9 @@ export function mapDbRowToWallpaper(row: any): Wallpaper {
         : typeof row.tags === 'string'
         ? row.tags
             .split(',')
-            .map((tag: string) => tag.trim())
+            .map((tag: string) =>
+              tag.trim()
+            )
             .filter(Boolean)
         : [],
 
@@ -260,27 +244,42 @@ export function mapDbRowToWallpaper(row: any): Wallpaper {
  * ============================================================
  * WALLPAPER -> DATABASE PAYLOAD
  * ============================================================
+ *
+ * Your existing database has an image_url column
+ * that is NOT NULL.
+ *
+ * Therefore we send BOTH image_url and url.
  */
 
 export function mapWallpaperToDbPayload(
   wp: Partial<Wallpaper>
 ) {
+  const imageUrl =
+    wp.url || '';
+
   return {
-    title: wp.title,
+    title:
+      wp.title ||
+      'Untitled Wallpaper',
 
     description:
-      wp.description || '',
+      wp.description ||
+      '',
 
     url:
-      wp.url || '',
+      imageUrl,
+
+    image_url:
+      imageUrl,
 
     thumbnail_url:
       wp.thumbnailUrl ||
-      wp.url ||
+      imageUrl ||
       '',
 
     category:
-      wp.category || 'Cyberpunk',
+      wp.category ||
+      'Cyberpunk',
 
     resolution:
       wp.resolution ||
@@ -300,7 +299,11 @@ export function mapWallpaperToDbPayload(
 
     color_hex:
       wp.colorHex ||
-      ['#0B1220', '#38BDF8', '#818CF8'],
+      [
+        '#0B1220',
+        '#38BDF8',
+        '#818CF8',
+      ],
 
     color_name:
       wp.colorName ||
@@ -308,7 +311,9 @@ export function mapWallpaperToDbPayload(
 
     upload_date:
       wp.uploadDate ||
-      new Date().toISOString().split('T')[0],
+      new Date()
+        .toISOString()
+        .split('T')[0],
 
     views:
       wp.views ?? 0,
@@ -320,7 +325,8 @@ export function mapWallpaperToDbPayload(
       wp.favorites ?? 0,
 
     tags:
-      wp.tags || [],
+      wp.tags ||
+      [],
 
     author:
       wp.author || {
@@ -334,7 +340,8 @@ export function mapWallpaperToDbPayload(
       'Station Creator',
 
     author_avatar:
-      wp.author?.avatar || null,
+      wp.author?.avatar ||
+      null,
 
     is_featured:
       wp.isFeatured ?? false,
@@ -360,15 +367,19 @@ export function mapWallpaperToDbPayload(
 export async function fetchWallpapersFromSupabase(): Promise<
   Wallpaper[]
 > {
-  const client = getSupabaseClient();
+  const client =
+    getSupabaseClient();
 
   if (!client) {
     throw new Error(
-      'Supabase is not configured. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'
+      'Supabase is not configured. Check your Supabase URL and key.'
     );
   }
 
-  const { data, error } = await client
+  const {
+    data,
+    error,
+  } = await client
     .from('wallpapers')
     .select('*')
     .order('created_at', {
@@ -391,15 +402,8 @@ export async function fetchWallpapersFromSupabase(): Promise<
 
 /**
  * ============================================================
- * UPLOAD FILE TO SUPABASE STORAGE + DATABASE
+ * UPLOAD FILE TO STORAGE + DATABASE
  * ============================================================
- *
- * IMPORTANT:
- * The Storage bucket is exactly:
- *
- * wallpapers
- *
- * Do NOT change this to "Wallpaper Station".
  */
 
 export async function uploadWallpaperFileAndSave({
@@ -419,32 +423,39 @@ export async function uploadWallpaperFileAndSave({
     | 'thumbnailUrl'
   >;
 }): Promise<Wallpaper> {
-  const client = getSupabaseClient();
+  const client =
+    getSupabaseClient();
 
   if (!client) {
     throw new Error(
-      'Supabase is not configured. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'
+      'Supabase is not configured.'
     );
   }
 
-  /**
-   * Storage bucket name.
-   */
-  const BUCKET_NAME = 'wallpapers';
+  const BUCKET_NAME =
+    'wallpapers';
 
   /**
-   * Make a safe unique filename.
+   * Create a safe unique filename.
    */
+
   const fileExt =
     file.name
       .split('.')
       .pop()
-      ?.toLowerCase() || 'jpg';
+      ?.toLowerCase() ||
+    'jpg';
 
   const safeBaseName =
     file.name
-      .replace(/\.[^/.]+$/, '')
-      .replace(/[^a-zA-Z0-9-_]/g, '-')
+      .replace(
+        /\.[^/.]+$/,
+        ''
+      )
+      .replace(
+        /[^a-zA-Z0-9-_]/g,
+        '-'
+      )
       .toLowerCase();
 
   const fileName =
@@ -452,9 +463,6 @@ export async function uploadWallpaperFileAndSave({
       .toString(36)
       .substring(2, 8)}-${safeBaseName}.${fileExt}`;
 
-  /**
-   * Put uploaded files inside "wallpapers/".
-   */
   const filePath =
     `wallpapers/${fileName}`;
 
@@ -475,7 +483,8 @@ export async function uploadWallpaperFileAndSave({
         cacheControl: '3600',
         upsert: false,
         contentType:
-          file.type || 'image/jpeg',
+          file.type ||
+          'image/jpeg',
       }
     );
 
@@ -492,28 +501,32 @@ export async function uploadWallpaperFileAndSave({
 
   /**
    * ==========================================================
-   * 2. GET PUBLIC IMAGE URL
+   * 2. GET PUBLIC URL
    * ==========================================================
    */
 
   const {
     data: publicUrlData,
-  } = client.storage
-    .from(BUCKET_NAME)
-    .getPublicUrl(filePath);
+  } =
+    client.storage
+      .from(BUCKET_NAME)
+      .getPublicUrl(
+        filePath
+      );
 
   const publicUrl =
-    publicUrlData.publicUrl;
+    publicUrlData?.publicUrl ||
+    '';
 
   if (!publicUrl) {
     throw new Error(
-      'Supabase uploaded the image but did not return a public URL.'
+      'Image uploaded but Supabase did not return a public URL.'
     );
   }
 
   /**
    * ==========================================================
-   * 3. SAVE METADATA TO wallpapers TABLE
+   * 3. SAVE METADATA
    * ==========================================================
    */
 
@@ -521,16 +534,20 @@ export async function uploadWallpaperFileAndSave({
     mapWallpaperToDbPayload({
       ...metadata,
 
-      url: publicUrl,
+      url:
+        publicUrl,
 
       thumbnailUrl:
         publicUrl,
 
-      views: 0,
+      views:
+        0,
 
-      downloads: 0,
+      downloads:
+        0,
 
-      favorites: 0,
+      favorites:
+        0,
 
       uploadDate:
         new Date()
@@ -541,11 +558,14 @@ export async function uploadWallpaperFileAndSave({
   const {
     data: insertedData,
     error: insertError,
-  } = await client
-    .from('wallpapers')
-    .insert([dbPayload])
-    .select()
-    .single();
+  } =
+    await client
+      .from('wallpapers')
+      .insert([
+        dbPayload,
+      ])
+      .select()
+      .single();
 
   if (insertError) {
     console.error(
@@ -553,10 +573,6 @@ export async function uploadWallpaperFileAndSave({
       insertError
     );
 
-    /**
-     * The image was uploaded but metadata failed.
-     * Tell the user exactly what happened.
-     */
     throw new Error(
       `Image uploaded, but database insert failed: ${insertError.message}`
     );
@@ -583,7 +599,8 @@ export async function insertWallpaperToSupabase(
     | 'uploadDate'
   >
 ): Promise<Wallpaper> {
-  const client = getSupabaseClient();
+  const client =
+    getSupabaseClient();
 
   if (!client) {
     throw new Error(
@@ -595,11 +612,14 @@ export async function insertWallpaperToSupabase(
     mapWallpaperToDbPayload({
       ...wpData,
 
-      views: 0,
+      views:
+        0,
 
-      downloads: 0,
+      downloads:
+        0,
 
-      favorites: 0,
+      favorites:
+        0,
 
       uploadDate:
         new Date()
@@ -610,11 +630,14 @@ export async function insertWallpaperToSupabase(
   const {
     data,
     error,
-  } = await client
-    .from('wallpapers')
-    .insert([dbPayload])
-    .select()
-    .single();
+  } =
+    await client
+      .from('wallpapers')
+      .insert([
+        dbPayload,
+      ])
+      .select()
+      .single();
 
   if (error) {
     console.error(
@@ -627,7 +650,9 @@ export async function insertWallpaperToSupabase(
     );
   }
 
-  return mapDbRowToWallpaper(data);
+  return mapDbRowToWallpaper(
+    data
+  );
 }
 
 /**
@@ -639,7 +664,8 @@ export async function insertWallpaperToSupabase(
 export async function deleteWallpaperFromSupabase(
   id: string
 ): Promise<void> {
-  const client = getSupabaseClient();
+  const client =
+    getSupabaseClient();
 
   if (!client) {
     throw new Error(
@@ -649,10 +675,11 @@ export async function deleteWallpaperFromSupabase(
 
   const {
     error,
-  } = await client
-    .from('wallpapers')
-    .delete()
-    .eq('id', id);
+  } =
+    await client
+      .from('wallpapers')
+      .delete()
+      .eq('id', id);
 
   if (error) {
     console.error(
@@ -678,7 +705,8 @@ export async function incrementStatsInSupabase(
     | 'favorites',
   incrementBy = 1
 ): Promise<void> {
-  const client = getSupabaseClient();
+  const client =
+    getSupabaseClient();
 
   if (!client) {
     return;
@@ -687,24 +715,28 @@ export async function incrementStatsInSupabase(
   const {
     data,
     error,
-  } = await client
-    .from('wallpapers')
-    .select(field)
-    .eq('id', id)
-    .single();
+  } =
+    await client
+      .from('wallpapers')
+      .select(field)
+      .eq('id', id)
+      .single();
 
   if (error || !data) {
     return;
   }
 
   const currentValue =
-    Number(data[field] || 0);
+    Number(
+      data[field] || 0
+    );
 
   await client
     .from('wallpapers')
     .update({
       [field]:
-        currentValue + incrementBy,
+        currentValue +
+        incrementBy,
     })
     .eq('id', id);
 }
@@ -718,7 +750,8 @@ export async function incrementStatsInSupabase(
 export async function seedInitialWallpapersToSupabase(
   initialWallpapers: Wallpaper[]
 ): Promise<Wallpaper[]> {
-  const client = getSupabaseClient();
+  const client =
+    getSupabaseClient();
 
   if (!client) {
     throw new Error(
@@ -727,17 +760,23 @@ export async function seedInitialWallpapersToSupabase(
   }
 
   const dbPayloads =
-    initialWallpapers.map((wp) =>
-      mapWallpaperToDbPayload(wp)
+    initialWallpapers.map(
+      (wp) =>
+        mapWallpaperToDbPayload(
+          wp
+        )
     );
 
   const {
     data,
     error,
-  } = await client
-    .from('wallpapers')
-    .insert(dbPayloads)
-    .select();
+  } =
+    await client
+      .from('wallpapers')
+      .insert(
+        dbPayloads
+      )
+      .select();
 
   if (error) {
     console.error(
@@ -766,6 +805,10 @@ export const SUPABASE_SQL_SCHEMA = `
 
 create extension if not exists pgcrypto;
 
+-- ============================================================
+-- WALLPAPERS TABLE
+-- ============================================================
+
 create table if not exists public.wallpapers (
   id uuid default gen_random_uuid() primary key,
 
@@ -773,7 +816,9 @@ create table if not exists public.wallpapers (
 
   description text,
 
-  url text not null,
+  image_url text,
+
+  url text,
 
   thumbnail_url text,
 
@@ -792,8 +837,7 @@ create table if not exists public.wallpapers (
 
   color_name text default 'Blue',
 
-  upload_date text
-    default to_char(now(), 'YYYY-MM-DD'),
+  upload_date date default current_date,
 
   views integer default 0,
 
@@ -806,9 +850,9 @@ create table if not exists public.wallpapers (
   author jsonb
     default '{"name":"Station Creator"}'::jsonb,
 
-  author_name text,
+  author_name text default 'Station Creator',
 
-  author_avatar text,
+  author_avatar text default '',
 
   is_featured boolean default false,
 
@@ -829,7 +873,7 @@ alter table public.wallpapers
 enable row level security;
 
 -- ============================================================
--- REMOVE OLD POLICIES IF THEY EXIST
+-- DATABASE POLICIES
 -- ============================================================
 
 drop policy if exists "Public Access Read"
@@ -843,10 +887,6 @@ on public.wallpapers;
 
 drop policy if exists "Public Access Delete"
 on public.wallpapers;
-
--- ============================================================
--- PUBLIC DATABASE POLICIES
--- ============================================================
 
 create policy "Public Access Read"
 on public.wallpapers
@@ -872,17 +912,13 @@ using (true);
 -- ============================================================
 -- STORAGE
 -- ============================================================
---
--- Create a Supabase Storage bucket manually:
---
+-- Storage bucket is created separately in Supabase.
 -- Bucket name:
+--
 -- wallpapers
 --
--- Make it PUBLIC.
---
--- The application uploads files to:
+-- The application uploads to:
 --
 -- wallpapers/wallpapers/<filename>
---
 -- ============================================================
 `;
