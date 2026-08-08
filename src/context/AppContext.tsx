@@ -27,7 +27,13 @@ export type PageView =
   | 'legal'
   | 'ai-generator';
 
+export type ThemeMode = 'dark' | 'light';
+
 interface AppContextType {
+  theme: ThemeMode;
+  toggleTheme: () => void;
+  setTheme: (theme: ThemeMode) => void;
+  resetToDefaultWallpapers: () => void;
   wallpapers: Wallpaper[];
   isLoadingWallpapers: boolean;
   wallpaperError: string | null;
@@ -90,13 +96,38 @@ const defaultUser: UserProfile = {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [wallpapers, setWallpapers] = useState<Wallpaper[]>(() => {
-    const saved = localStorage.getItem('ws_wallpapers');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
-    }
-    return INITIAL_WALLPAPERS;
+  const [theme, setThemeState] = useState<ThemeMode>(() => {
+    const saved = localStorage.getItem('ws_theme');
+    if (saved === 'light' || saved === 'dark') return saved;
+    return 'dark';
   });
+
+  const setTheme = useCallback((newTheme: ThemeMode) => {
+    setThemeState(newTheme);
+    localStorage.setItem('ws_theme', newTheme);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+  }, [theme, setTheme]);
+
+  useEffect(() => {
+    if (theme === 'light') {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    }
+  }, [theme]);
+
+  const [wallpapers, setWallpapers] = useState<Wallpaper[]>(INITIAL_WALLPAPERS);
+
+  const resetToDefaultWallpapers = useCallback(() => {
+    localStorage.removeItem('ws_wallpapers');
+    setWallpapers(INITIAL_WALLPAPERS);
+  }, []);
 
   const [isLoadingWallpapers, setIsLoadingWallpapers] = useState<boolean>(true);
   const [wallpaperError, setWallpaperError] = useState<string | null>(null);
@@ -517,6 +548,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider
       value={{
+        theme,
+        toggleTheme,
+        setTheme,
+        resetToDefaultWallpapers,
         wallpapers,
         isLoadingWallpapers,
         wallpaperError,

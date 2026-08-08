@@ -16,7 +16,10 @@ import {
   LogOut,
   Upload,
   UserPlus,
-  HelpCircle
+  HelpCircle,
+  Sun,
+  Moon,
+  RotateCcw
 } from 'lucide-react';
 import { useApp, PageView } from '../context/AppContext';
 import { JoinModal } from './JoinModal';
@@ -29,6 +32,9 @@ export const Navbar: React.FC = () => {
     setUser,
     triggerSearch,
     filters,
+    theme,
+    toggleTheme,
+    resetToDefaultWallpapers
   } = useApp();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -128,12 +134,35 @@ export const Navbar: React.FC = () => {
             })}
           </nav>
 
-          {/* Right Actions: Join Button, Admin Suite & User Profile */}
-          <div className="flex items-center gap-3 shrink-0">
+          {/* Right Actions: Theme Toggle, Join Button, Admin Suite & User Profile */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            {/* Day / Night Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Switch to Day Mode (Light Theme)' : 'Switch to Night Mode (Dark Theme)'}
+              className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all duration-300 flex items-center gap-2 shadow-sm ${
+                theme === 'dark'
+                  ? 'bg-slate-900/90 border-slate-700/80 text-amber-400 hover:bg-slate-800 hover:border-amber-400/50'
+                  : 'bg-white border-slate-200 text-sky-600 hover:bg-slate-50 hover:border-sky-400'
+              }`}
+            >
+              {theme === 'dark' ? (
+                <>
+                  <Sun className="w-4 h-4 text-amber-400 animate-spin-slow" />
+                  <span className="hidden sm:inline">Day</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 text-sky-600" />
+                  <span className="hidden sm:inline">Night</span>
+                </>
+              )}
+            </button>
+
             {/* Join Button */}
             <button
               onClick={() => setJoinModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-md shadow-sky-500/20 transition-all hover:scale-105 active:scale-95"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-md shadow-sky-500/20 transition-all hover:scale-105 active:scale-95"
             >
               <UserPlus className="w-4 h-4" />
               <span>Join</span>
@@ -219,6 +248,25 @@ export const Navbar: React.FC = () => {
                       >
                         <Upload className="w-4 h-4 text-indigo-400" />
                         <span>Upload Wallpaper</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          toggleTheme();
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-amber-400 hover:bg-amber-500/10 transition-colors"
+                      >
+                        {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-sky-400" />}
+                        <span>{theme === 'dark' ? 'Switch to Day Mode' : 'Switch to Night Mode'}</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          resetToDefaultWallpapers();
+                          setProfileDropdownOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors"
+                      >
+                        <RotateCcw className="w-4 h-4 text-slate-400" />
+                        <span>Reset Default Wallpapers</span>
                       </button>
                     </div>
 

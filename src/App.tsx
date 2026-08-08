@@ -22,7 +22,7 @@ import { LegalPage } from './pages/LegalPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 const MainContent: React.FC = () => {
-  const { activePage } = useApp();
+  const { activePage, theme } = useApp();
 
   const renderPage = () => {
     switch (activePage) {
@@ -58,7 +58,9 @@ const MainContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0B1220] text-slate-100 selection:bg-sky-500 selection:text-white">
+    <div className={`min-h-screen flex flex-col transition-colors duration-300 selection:bg-sky-500 selection:text-white ${
+      theme === 'light' ? 'bg-slate-100 text-slate-900' : 'bg-[#0B1220] text-slate-100'
+    }`}>
       <Navbar />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8">
