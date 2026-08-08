@@ -17,8 +17,10 @@ export const isSupabaseConfigured = (): boolean => {
   return Boolean(
     url &&
     key &&
+    url.startsWith('http') &&
     url !== 'https://your-supabase-project.supabase.co' &&
-    key !== 'your-supabase-anon-key'
+    key !== 'your-supabase-anon-key' &&
+    key.length > 20
   );
 };
 
@@ -29,8 +31,10 @@ export const getSupabaseClient = (): SupabaseClient | null => {
   if (
     url &&
     key &&
+    url.startsWith('http') &&
     url !== 'https://your-supabase-project.supabase.co' &&
-    key !== 'your-supabase-anon-key'
+    key !== 'your-supabase-anon-key' &&
+    key.length > 20
   ) {
     if (!clientInstance) {
       clientInstance = createClient(url, key);
@@ -127,7 +131,7 @@ export async function fetchWallpapersFromSupabase(): Promise<Wallpaper[]> {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Supabase fetch error:', error);
+    console.warn('Supabase fetch notice:', error.message || error);
     throw error;
   }
 
@@ -160,7 +164,7 @@ export async function uploadWallpaperFileAndSave({
     });
 
   if (uploadError) {
-    console.error('Storage upload error:', uploadError);
+    console.warn('Storage upload notice:', uploadError.message || uploadError);
     throw new Error(`Storage upload failed: ${uploadError.message}`);
   }
 
@@ -189,7 +193,7 @@ export async function uploadWallpaperFileAndSave({
     .single();
 
   if (insertError) {
-    console.error('DB Insert error:', insertError);
+    console.warn('DB Insert notice:', insertError.message || insertError);
     throw new Error(`Database insert failed: ${insertError.message}`);
   }
 
@@ -220,7 +224,7 @@ export async function insertWallpaperToSupabase(
     .single();
 
   if (error) {
-    console.error('DB Insert error:', error);
+    console.warn('DB Insert notice:', error.message || error);
     throw new Error(`Database insert failed: ${error.message}`);
   }
 
@@ -238,7 +242,7 @@ export async function deleteWallpaperFromSupabase(id: string): Promise<void> {
     .eq('id', id);
 
   if (error) {
-    console.error('DB Delete error:', error);
+    console.warn('DB Delete notice:', error.message || error);
     throw error;
   }
 }
@@ -282,7 +286,7 @@ export async function seedInitialWallpapersToSupabase(
     .select();
 
   if (error) {
-    console.error('Seed error:', error);
+    console.warn('Seed notice:', error.message || error);
     throw error;
   }
 
