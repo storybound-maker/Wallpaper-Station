@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { MasonryGrid } from '../components/MasonryGrid';
 
 export const LatestPage: React.FC = () => {
-  const { wallpapers } = useApp();
+  const { wallpapers, isLoadingWallpapers } = useApp();
 
   const newestWallpapers = [...wallpapers].sort(
     (a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()
@@ -23,7 +23,7 @@ export const LatestPage: React.FC = () => {
         </p>
       </div>
 
-      <MasonryGrid wallpapers={newestWallpapers} />
+      <MasonryGrid wallpapers={newestWallpapers} isLoading={isLoadingWallpapers} />
     </div>
   );
 };

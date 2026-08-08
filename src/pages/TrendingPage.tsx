@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { MasonryGrid } from '../components/MasonryGrid';
 
 export const TrendingPage: React.FC = () => {
-  const { wallpapers } = useApp();
+  const { wallpapers, isLoadingWallpapers } = useApp();
   const [timeframe, setTimeframe] = useState<'week' | 'month' | 'all'>('week');
 
   // Sort by downloads & views
@@ -52,7 +52,7 @@ export const TrendingPage: React.FC = () => {
         </div>
       </div>
 
-      <MasonryGrid wallpapers={trendingWallpapers} />
+      <MasonryGrid wallpapers={trendingWallpapers} isLoading={isLoadingWallpapers} />
     </div>
   );
 };

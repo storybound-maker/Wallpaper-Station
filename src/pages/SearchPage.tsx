@@ -6,7 +6,7 @@ import { CATEGORIES_DATA } from '../data/wallpapers';
 import { MasonryGrid } from '../components/MasonryGrid';
 
 export const SearchPage: React.FC = () => {
-  const { wallpapers, filters, setFilters, selectedCategory, setSelectedCategory, resetFilters } = useApp();
+  const { wallpapers, isLoadingWallpapers, filters, setFilters, selectedCategory, setSelectedCategory, resetFilters } = useApp();
 
   // Filter logic
   const filteredWallpapers = wallpapers.filter((wp) => {
@@ -243,7 +243,7 @@ export const SearchPage: React.FC = () => {
       </div>
 
       {/* Grid Results */}
-      <MasonryGrid wallpapers={filteredWallpapers} />
+      <MasonryGrid wallpapers={filteredWallpapers} isLoading={isLoadingWallpapers} />
     </div>
   );
 };

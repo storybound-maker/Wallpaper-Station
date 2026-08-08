@@ -20,6 +20,7 @@ import { MasonryGrid } from '../components/MasonryGrid';
 export const HomePage: React.FC = () => {
   const {
     wallpapers,
+    isLoadingWallpapers,
     curatedCollections,
     setActivePage,
     setSelectedCategory,
@@ -263,7 +264,7 @@ export const HomePage: React.FC = () => {
         </div>
 
         {/* Masonry Wallpaper Feed */}
-        <MasonryGrid wallpapers={getDisplayedWallpapers()} />
+        <MasonryGrid wallpapers={getDisplayedWallpapers()} isLoading={isLoadingWallpapers} />
       </section>
 
       {/* Curated Collections Banner */}
