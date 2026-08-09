@@ -20,15 +20,18 @@ export const ADMIN_SUPABASE_UID =
 ============================================================ */
 
 export const getSupabaseConfig = () => {
-  const customUrl =
-    typeof window !== 'undefined'
-      ? localStorage.getItem('ws_supabase_url')
-      : null;
+  let customUrl: string | null = null;
+  let customKey: string | null = null;
 
-  const customKey =
-    typeof window !== 'undefined'
-      ? localStorage.getItem('ws_supabase_key')
-      : null;
+  if (typeof window !== 'undefined') {
+    try {
+      customUrl = localStorage.getItem('ws_supabase_url');
+      customKey = localStorage.getItem('ws_supabase_key');
+    } catch {
+      customUrl = null;
+      customKey = null;
+    }
+  }
 
   const url =
     customUrl ||
@@ -41,19 +44,23 @@ export const getSupabaseConfig = () => {
     '';
 
   return {
-    url: url.trim(),
-    key: key.trim(),
+    url: String(url).trim(),
+    key: String(key).trim(),
   };
 };
+
+/* ============================================================
+   CHECK SUPABASE CONFIGURATION
+============================================================ */
 
 export const isSupabaseConfigured = (): boolean => {
   const config = getSupabaseConfig();
 
   return Boolean(
     config.url &&
-      config.key &&
-      config.url.startsWith('https://') &&
-      config.key.length > 20
+    config.key &&
+    config.url.startsWith('https://') &&
+    config.key.length > 20
   );
 };
 
@@ -88,10 +95,16 @@ export const getSupabaseClient = (): SupabaseClient | null => {
   return clientInstance;
 };
 
-export const resetSupabaseClientInstance = () => {
+export const resetSupabaseClientInstance = (): void => {
   clientInstance = null;
 };
 
+/*
+ * Keep this export for compatibility with existing code.
+ *
+ * Important:
+ * The client is created lazily by getSupabaseClient().
+ */
 export const supabase: SupabaseClient | null =
   getSupabaseClient();
 
@@ -114,7 +127,7 @@ export const signInWithEmail = async (
     };
   }
 
-  return await client.auth.signInWithPassword({
+  return client.auth.signInWithPassword({
     email,
     password,
   });
@@ -139,7 +152,7 @@ export const signUpWithEmail = async (
     };
   }
 
-  return await client.auth.signUp({
+  return client.auth.signUp({
     email,
     password,
     options: {
@@ -151,7 +164,7 @@ export const signUpWithEmail = async (
   });
 };
 
-export const signOutUser = async () => {
+export const signOutUser = async (): Promise<void> => {
   const client = getSupabaseClient();
 
   if (!client) {
@@ -160,8 +173,7 @@ export const signOutUser = async () => {
     );
   }
 
-  const result =
-    await client.auth.signOut();
+  const result = await client.auth.signOut();
 
   if (result.error) {
     throw result.error;
@@ -320,22 +332,22 @@ export function mapDbRowToWallpaper(
     isFeatured:
       Boolean(
         row.is_featured ??
-          row.isFeatured ??
-          false
+        row.isFeatured ??
+        false
       ),
 
     isWallpaperOfTheDay:
       Boolean(
         row.is_wallpaper_of_the_day ??
-          row.isWallpaperOfTheDay ??
-          false
+        row.isWallpaperOfTheDay ??
+        false
       ),
 
     isAIGenerated:
       Boolean(
         row.is_ai_generated ??
-          row.isAIGenerated ??
-          false
+        row.isAIGenerated ??
+        false
       ),
 
     aspectRatio:
@@ -352,8 +364,7 @@ export function mapDbRowToWallpaper(
 export function mapWallpaperToDbPayload(
   wp: Partial<Wallpaper>
 ) {
-  const imageUrl =
-    wp.url || '';
+  const imageUrl = wp.url || '';
 
   return {
     title:
@@ -364,11 +375,9 @@ export function mapWallpaperToDbPayload(
       wp.description ||
       '',
 
-    url:
-      imageUrl,
+    url: imageUrl,
 
-    image_url:
-      imageUrl,
+    image_url: imageUrl,
 
     thumbnail_url:
       wp.thumbnailUrl ||
@@ -428,9 +437,7 @@ export function mapWallpaperToDbPayload(
 
     author:
       wp.author || {
-        name:
-          'Station Creator',
-
+        name: 'Station Creator',
         avatar:
           'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
       },
@@ -444,8 +451,7 @@ export function mapWallpaperToDbPayload(
       null,
 
     is_featured:
-      wp.isFeatured ??
-      false,
+      wp.isFeatured ?? false,
 
     is_wallpaper_of_the_day:
       wp.isWallpaperOfTheDay ??
@@ -481,12 +487,9 @@ export async function fetchWallpapersFromSupabase(): Promise<
     await client
       .from('wallpapers')
       .select('*')
-      .order(
-        'created_at',
-        {
-          ascending: false,
-        }
-      );
+      .order('created_at', {
+        ascending: false,
+      });
 
   if (result.error) {
     console.error(
@@ -499,9 +502,7 @@ export async function fetchWallpapersFromSupabase(): Promise<
 
   return (
     result.data || []
-  ).map(
-    mapDbRowToWallpaper
-  );
+  ).map(mapDbRowToWallpaper);
 }
 
 /* ============================================================
@@ -534,8 +535,7 @@ export async function uploadWallpaperFileAndSave({
     );
   }
 
-  const bucketName =
-    'wallpapers';
+  const bucketName = 'wallpapers';
 
   const fileParts =
     file.name.split('.');
@@ -562,10 +562,7 @@ export async function uploadWallpaperFileAndSave({
   const randomId =
     Math.random()
       .toString(36)
-      .substring(
-        2,
-        8
-      );
+      .substring(2, 8);
 
   const fileName =
     String(Date.now()) +
@@ -587,12 +584,8 @@ export async function uploadWallpaperFileAndSave({
         filePath,
         file,
         {
-          cacheControl:
-            '3600',
-
-          upsert:
-            false,
-
+          cacheControl: '3600',
+          upsert: false,
           contentType:
             file.type ||
             'image/jpeg',
@@ -607,16 +600,14 @@ export async function uploadWallpaperFileAndSave({
 
     throw new Error(
       'Storage upload failed: ' +
-        uploadResult.error.message
+      uploadResult.error.message
     );
   }
 
   const publicResult =
     client.storage
       .from(bucketName)
-      .getPublicUrl(
-        filePath
-      );
+      .getPublicUrl(filePath);
 
   const publicUrl =
     publicResult.data?.publicUrl ||
@@ -632,20 +623,15 @@ export async function uploadWallpaperFileAndSave({
     mapWallpaperToDbPayload({
       ...metadata,
 
-      url:
-        publicUrl,
+      url: publicUrl,
 
-      thumbnailUrl:
-        publicUrl,
+      thumbnailUrl: publicUrl,
 
-      views:
-        0,
+      views: 0,
 
-      downloads:
-        0,
+      downloads: 0,
 
-      favorites:
-        0,
+      favorites: 0,
 
       uploadDate:
         new Date()
@@ -656,9 +642,7 @@ export async function uploadWallpaperFileAndSave({
   const insertResult =
     await client
       .from('wallpapers')
-      .insert([
-        dbPayload,
-      ])
+      .insert([dbPayload])
       .select()
       .single();
 
@@ -670,7 +654,7 @@ export async function uploadWallpaperFileAndSave({
 
     throw new Error(
       'Image uploaded, but database insert failed: ' +
-        insertResult.error.message
+      insertResult.error.message
     );
   }
 
@@ -706,14 +690,11 @@ export async function insertWallpaperToSupabase(
     mapWallpaperToDbPayload({
       ...wpData,
 
-      views:
-        0,
+      views: 0,
 
-      downloads:
-        0,
+      downloads: 0,
 
-      favorites:
-        0,
+      favorites: 0,
 
       uploadDate:
         new Date()
@@ -724,9 +705,7 @@ export async function insertWallpaperToSupabase(
   const result =
     await client
       .from('wallpapers')
-      .insert([
-        dbPayload,
-      ])
+      .insert([dbPayload])
       .select()
       .single();
 
@@ -738,7 +717,7 @@ export async function insertWallpaperToSupabase(
 
     throw new Error(
       'Database insert failed: ' +
-        result.error.message
+      result.error.message
     );
   }
 
@@ -767,10 +746,7 @@ export async function deleteWallpaperFromSupabase(
     await client
       .from('wallpapers')
       .delete()
-      .eq(
-        'id',
-        id
-      );
+      .eq('id', id);
 
   if (result.error) {
     console.error(
@@ -805,10 +781,7 @@ export async function incrementStatsInSupabase(
     await client
       .from('wallpapers')
       .select(field)
-      .eq(
-        'id',
-        id
-      )
+      .eq('id', id)
       .single();
 
   if (
@@ -820,24 +793,17 @@ export async function incrementStatsInSupabase(
 
   const currentValue =
     Number(
-      result.data[field] ||
-        0
+      result.data[field] || 0
     );
-
-  const newValue =
-    currentValue +
-    incrementBy;
 
   await client
     .from('wallpapers')
     .update({
       [field]:
-        newValue,
+        currentValue +
+        incrementBy,
     })
-    .eq(
-      'id',
-      id
-    );
+    .eq('id', id);
 }
 
 /* ============================================================
@@ -858,9 +824,7 @@ export async function seedInitialWallpapersToSupabase(
 
   const payloads =
     initialWallpapers.map(
-      (
-        wallpaper
-      ) =>
+      (wallpaper) =>
         mapWallpaperToDbPayload(
           wallpaper
         )
@@ -869,9 +833,7 @@ export async function seedInitialWallpapersToSupabase(
   const result =
     await client
       .from('wallpapers')
-      .insert(
-        payloads
-      )
+      .insert(payloads)
       .select();
 
   if (result.error) {
@@ -885,9 +847,7 @@ export async function seedInitialWallpapersToSupabase(
 
   return (
     result.data || []
-  ).map(
-    mapDbRowToWallpaper
-  );
+  ).map(mapDbRowToWallpaper);
 }
 
 /* ============================================================
