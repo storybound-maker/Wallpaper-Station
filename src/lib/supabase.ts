@@ -6,11 +6,9 @@ import {
   OrientationType,
 } from '../types';
 
-/**
- * ============================================================
- * SUPABASE CONFIGURATION
- * ============================================================
- */
+/* ============================================================
+   SUPABASE CONFIGURATION
+   ============================================================ */
 
 export const getSupabaseConfig = () => {
   const customUrl =
@@ -50,11 +48,9 @@ export const isSupabaseConfigured = (): boolean => {
   );
 };
 
-/**
- * ============================================================
- * SUPABASE CLIENT
- * ============================================================
- */
+/* ============================================================
+   SUPABASE CLIENT
+   ============================================================ */
 
 let clientInstance: SupabaseClient | null = null;
 
@@ -87,11 +83,9 @@ export const resetSupabaseClientInstance = () => {
 export const supabase: SupabaseClient | null =
   getSupabaseClient();
 
-/**
- * ============================================================
- * DATABASE ROW -> WALLPAPER
- * ============================================================
- */
+/* ============================================================
+   DATABASE ROW -> WALLPAPER
+   ============================================================ */
 
 export function mapDbRowToWallpaper(row: any): Wallpaper {
   return {
@@ -176,9 +170,7 @@ export function mapDbRowToWallpaper(row: any): Wallpaper {
         : typeof row.tags === 'string'
           ? row.tags
               .split(',')
-              .map((tag: string) =>
-                tag.trim()
-              )
+              .map((tag: string) => tag.trim())
               .filter(Boolean)
           : [],
 
@@ -240,11 +232,9 @@ export function mapDbRowToWallpaper(row: any): Wallpaper {
   };
 }
 
-/**
- * ============================================================
- * WALLPAPER -> DATABASE PAYLOAD
- * ============================================================
- */
+/* ============================================================
+   WALLPAPER -> DATABASE PAYLOAD
+   ============================================================ */
 
 export function mapWallpaperToDbPayload(
   wp: Partial<Wallpaper>
@@ -260,11 +250,9 @@ export function mapWallpaperToDbPayload(
       wp.description ||
       '',
 
-    url:
-      imageUrl,
+    url: imageUrl,
 
-    image_url:
-      imageUrl,
+    image_url: imageUrl,
 
     thumbnail_url:
       wp.thumbnailUrl ||
@@ -352,13 +340,13 @@ export function mapWallpaperToDbPayload(
   };
 }
 
-/**
- * ============================================================
- * FETCH WALLPAPERS
- * ============================================================
- */
+/* ============================================================
+   FETCH WALLPAPERS
+   ============================================================ */
 
-export async function fetchWallpapersFromSupabase(): Promise<Wallpaper[]> {
+export async function fetchWallpapersFromSupabase(): Promise<
+  Wallpaper[]
+> {
   const client = getSupabaseClient();
 
   if (!client) {
@@ -391,18 +379,15 @@ export async function fetchWallpapersFromSupabase(): Promise<Wallpaper[]> {
   );
 }
 
-/**
- * ============================================================
- * UPLOAD FILE TO STORAGE + DATABASE
- * ============================================================
- */
+/* ============================================================
+   UPLOAD FILE TO STORAGE + DATABASE
+   ============================================================ */
 
 export async function uploadWallpaperFileAndSave({
   file,
   metadata,
 }: {
   file: File;
-
   metadata: Omit<
     Wallpaper,
     | 'id'
@@ -414,8 +399,7 @@ export async function uploadWallpaperFileAndSave({
     | 'thumbnailUrl'
   >;
 }): Promise<Wallpaper> {
-  const client =
-    getSupabaseClient();
+  const client = getSupabaseClient();
 
   if (!client) {
     throw new Error(
@@ -423,8 +407,7 @@ export async function uploadWallpaperFileAndSave({
     );
   }
 
-  const BUCKET_NAME =
-    'wallpapers';
+  const BUCKET_NAME = 'wallpapers';
 
   const fileExt =
     file.name
@@ -435,10 +418,7 @@ export async function uploadWallpaperFileAndSave({
 
   const safeBaseName =
     file.name
-      .replace(
-        /\.[^/.]+$/,
-        ''
-      )
+      .replace(/\.[^/.]+$/, '')
       .replace(
         /[^a-zA-Z0-9-_]/g,
         '-'
@@ -453,11 +433,7 @@ export async function uploadWallpaperFileAndSave({
   const filePath =
     `wallpapers/${fileName}`;
 
-  /**
-   * ==========================================================
-   * 1. UPLOAD IMAGE
-   * ==========================================================
-   */
+  /* Upload image */
 
   const {
     error: uploadError,
@@ -467,10 +443,8 @@ export async function uploadWallpaperFileAndSave({
       filePath,
       file,
       {
-        cacheControl:
-          '3600',
-        upsert:
-          false,
+        cacheControl: '3600',
+        upsert: false,
         contentType:
           file.type ||
           'image/jpeg',
@@ -488,20 +462,13 @@ export async function uploadWallpaperFileAndSave({
     );
   }
 
-  /**
-   * ==========================================================
-   * 2. GET PUBLIC URL
-   * ==========================================================
-   */
+  /* Get public URL */
 
   const {
     data: publicUrlData,
-  } =
-    client.storage
-      .from(BUCKET_NAME)
-      .getPublicUrl(
-        filePath
-      );
+  } = client.storage
+    .from(BUCKET_NAME)
+    .getPublicUrl(filePath);
 
   const publicUrl =
     publicUrlData?.publicUrl ||
@@ -513,30 +480,22 @@ export async function uploadWallpaperFileAndSave({
     );
   }
 
-  /**
-   * ==========================================================
-   * 3. SAVE METADATA
-   * ==========================================================
-   */
+  /* Save database metadata */
 
   const dbPayload =
     mapWallpaperToDbPayload({
       ...metadata,
 
-      url:
-        publicUrl,
+      url: publicUrl,
 
       thumbnailUrl:
         publicUrl,
 
-      views:
-        0,
+      views: 0,
 
-      downloads:
-        0,
+      downloads: 0,
 
-      favorites:
-        0,
+      favorites: 0,
 
       uploadDate:
         new Date()
@@ -547,14 +506,11 @@ export async function uploadWallpaperFileAndSave({
   const {
     data: insertedData,
     error: insertError,
-  } =
-    await client
-      .from('wallpapers')
-      .insert([
-        dbPayload,
-      ])
-      .select()
-      .single();
+  } = await client
+    .from('wallpapers')
+    .insert([dbPayload])
+    .select()
+    .single();
 
   if (insertError) {
     console.error(
@@ -572,11 +528,9 @@ export async function uploadWallpaperFileAndSave({
   );
 }
 
-/**
- * ============================================================
- * INSERT WALLPAPER USING EXISTING URL
- * ============================================================
- */
+/* ============================================================
+   INSERT WALLPAPER USING EXISTING URL
+   ============================================================ */
 
 export async function insertWallpaperToSupabase(
   wpData: Omit<
@@ -588,8 +542,7 @@ export async function insertWallpaperToSupabase(
     | 'uploadDate'
   >
 ): Promise<Wallpaper> {
-  const client =
-    getSupabaseClient();
+  const client = getSupabaseClient();
 
   if (!client) {
     throw new Error(
@@ -601,14 +554,9 @@ export async function insertWallpaperToSupabase(
     mapWallpaperToDbPayload({
       ...wpData,
 
-      views:
-        0,
-
-      downloads:
-        0,
-
-      favorites:
-        0,
+      views: 0,
+      downloads: 0,
+      favorites: 0,
 
       uploadDate:
         new Date()
@@ -619,14 +567,11 @@ export async function insertWallpaperToSupabase(
   const {
     data,
     error,
-  } =
-    await client
-      .from('wallpapers')
-      .insert([
-        dbPayload,
-      ])
-      .select()
-      .single();
+  } = await client
+    .from('wallpapers')
+    .insert([dbPayload])
+    .select()
+    .single();
 
   if (error) {
     console.error(
@@ -639,22 +584,17 @@ export async function insertWallpaperToSupabase(
     );
   }
 
-  return mapDbRowToWallpaper(
-    data
-  );
+  return mapDbRowToWallpaper(data);
 }
 
-/**
- * ============================================================
- * DELETE WALLPAPER
- * ============================================================
- */
+/* ============================================================
+   DELETE WALLPAPER
+   ============================================================ */
 
 export async function deleteWallpaperFromSupabase(
   id: string
 ): Promise<void> {
-  const client =
-    getSupabaseClient();
+  const client = getSupabaseClient();
 
   if (!client) {
     throw new Error(
@@ -664,11 +604,10 @@ export async function deleteWallpaperFromSupabase(
 
   const {
     error,
-  } =
-    await client
-      .from('wallpapers')
-      .delete()
-      .eq('id', id);
+  } = await client
+    .from('wallpapers')
+    .delete()
+    .eq('id', id);
 
   if (error) {
     console.error(
@@ -680,11 +619,9 @@ export async function deleteWallpaperFromSupabase(
   }
 }
 
-/**
- * ============================================================
- * UPDATE WALLPAPER STATS
- * ============================================================
- */
+/* ============================================================
+   UPDATE WALLPAPER STATS
+   ============================================================ */
 
 export async function incrementStatsInSupabase(
   id: string,
@@ -694,8 +631,7 @@ export async function incrementStatsInSupabase(
     | 'favorites',
   incrementBy = 1
 ): Promise<void> {
-  const client =
-    getSupabaseClient();
+  const client = getSupabaseClient();
 
   if (!client) {
     return;
@@ -704,21 +640,18 @@ export async function incrementStatsInSupabase(
   const {
     data,
     error,
-  } =
-    await client
-      .from('wallpapers')
-      .select(field)
-      .eq('id', id)
-      .single();
+  } = await client
+    .from('wallpapers')
+    .select(field)
+    .eq('id', id)
+    .single();
 
   if (error || !data) {
     return;
   }
 
   const currentValue =
-    Number(
-      data[field] || 0
-    );
+    Number(data[field] || 0);
 
   await client
     .from('wallpapers')
@@ -730,17 +663,14 @@ export async function incrementStatsInSupabase(
     .eq('id', id);
 }
 
-/**
- * ============================================================
- * SEED INITIAL WALLPAPERS
- * ============================================================
- */
+/* ============================================================
+   SEED INITIAL WALLPAPERS
+   ============================================================ */
 
 export async function seedInitialWallpapersToSupabase(
   initialWallpapers: Wallpaper[]
 ): Promise<Wallpaper[]> {
-  const client =
-    getSupabaseClient();
+  const client = getSupabaseClient();
 
   if (!client) {
     throw new Error(
@@ -751,21 +681,16 @@ export async function seedInitialWallpapersToSupabase(
   const dbPayloads =
     initialWallpapers.map(
       (wp) =>
-        mapWallpaperToDbPayload(
-          wp
-        )
+        mapWallpaperToDbPayload(wp)
     );
 
   const {
     data,
     error,
-  } =
-    await client
-      .from('wallpapers')
-      .insert(
-        dbPayloads
-      )
-      .select();
+  } = await client
+    .from('wallpapers')
+    .insert(dbPayloads)
+    .select();
 
   if (error) {
     console.error(
@@ -781,26 +706,12 @@ export async function seedInitialWallpapersToSupabase(
   );
 }
 
-/**
- * ============================================================
- * SQL SCHEMA
- *
- * IMPORTANT:
- * This is only exported because AdminDashboard imports it.
- * It does NOT automatically execute the SQL.
- * ============================================================
- */
+/* ============================================================
+   SUPABASE SQL SCHEMA
+   ============================================================ */
 
 export const SUPABASE_SQL_SCHEMA = `
--- ============================================================
--- WALLPAPER STATION DATABASE
--- ============================================================
-
 create extension if not exists pgcrypto;
-
--- ============================================================
--- WALLPAPERS TABLE
--- ============================================================
 
 create table if not exists public.wallpapers (
   id uuid default gen_random_uuid() primary key,
@@ -858,18 +769,19 @@ create table if not exists public.wallpapers (
   created_at timestamptz default now()
 );
 
--- ============================================================
--- ENABLE ROW LEVEL SECURITY
--- ============================================================
-
 alter table public.wallpapers
 enable row level security;
 
--- ============================================================
--- PUBLIC READ POLICY
--- ============================================================
-
 drop policy if exists "Public Access Read"
+on public.wallpapers;
+
+drop policy if exists "Public Access Insert"
+on public.wallpapers;
+
+drop policy if exists "Public Access Update"
+on public.wallpapers;
+
+drop policy if exists "Public Access Delete"
 on public.wallpapers;
 
 create policy "Public Access Read"
@@ -877,7 +789,34 @@ on public.wallpapers
 for select
 using (true);
 
--- ============================================================
--- END OF SCHEMA
--- ============================================================
+create policy "Authenticated Admin Insert"
+on public.wallpapers
+for insert
+to authenticated
+with check (
+  auth.uid() = '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
+);
+
+create policy "Authenticated Admin Update"
+on public.wallpapers
+for update
+to authenticated
+using (
+  auth.uid() = '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
+)
+with check (
+  auth.uid() = '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
+);
+
+create policy "Authenticated Admin Delete"
+on public.wallpapers
+for delete
+to authenticated
+using (
+  auth.uid() = '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
+);
 `;
+
+/* ============================================================
+   END
+   ============================================================ */
