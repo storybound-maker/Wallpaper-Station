@@ -963,4 +963,3 @@ export const SUPABASE_SQL_SCHEMA = [
   ');',
 ].join('\n');
 ```
-
