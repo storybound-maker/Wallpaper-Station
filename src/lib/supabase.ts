@@ -374,4 +374,57 @@ create policy "Public Access Delete" on public.wallpapers for delete using (true
 -- Name: "wallpapers"
 -- Toggle ON "Public Bucket"
 -- Under Storage Policies, create a policy allowing Public Read and Uploads.
+export const SUPABASE_SQL_SCHEMA = `
+-- Wallpaper Station database schema
+
+create extension if not exists pgcrypto;
+
+create table if not exists public.wallpapers (
+  id uuid default gen_random_uuid() primary key,
+
+  title text not null,
+  description text,
+
+  image_url text,
+  url text,
+  thumbnail_url text,
+
+  category text not null default 'Cyberpunk',
+
+  resolution text default '3840 x 2160',
+  resolution_tag text default '4K',
+  size text default '5.0 MB',
+
+  orientation text default 'landscape',
+
+  color_hex jsonb
+    default '["#0B1220", "#38BDF8", "#818CF8"]'::jsonb,
+
+  color_name text default 'Blue',
+
+  upload_date date default current_date,
+
+  views integer default 0,
+  downloads integer default 0,
+  favorites integer default 0,
+
+  tags jsonb default '[]'::jsonb,
+
+  author jsonb
+    default '{"name":"Station Creator"}'::jsonb,
+
+  author_name text default 'Station Creator',
+  author_avatar text default '',
+
+  is_featured boolean default false,
+  is_wallpaper_of_the_day boolean default false,
+  is_ai_generated boolean default false,
+
+  aspect_ratio text default '16:9',
+
+  created_at timestamptz default now()
+);
+
+alter table public.wallpapers enable row level security;
+`;
 `;
