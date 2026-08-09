@@ -285,6 +285,62 @@ export async function deleteWallpaperFromSupabase(id: string): Promise<void> {
   }
 }
 
+// Update wallpaper metadata in Supabase without changing statistics.
+export async function updateWallpaperInSupabase(
+  id: string,
+  updated: Partial<Wallpaper>
+): Promise<Wallpaper> {
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error('Supabase client is not initialized.');
+  }
+
+  const dbPayload: Record<string, any> = {};
+
+  if (updated.title !== undefined) dbPayload.title = updated.title;
+  if (updated.description !== undefined) dbPayload.description = updated.description;
+  if (updated.url !== undefined) dbPayload.url = updated.url;
+  if (updated.thumbnailUrl !== undefined) dbPayload.thumbnail_url = updated.thumbnailUrl;
+  if (updated.category !== undefined) dbPayload.category = updated.category;
+  if (updated.resolution !== undefined) dbPayload.resolution = updated.resolution;
+  if (updated.resolutionTag !== undefined) dbPayload.resolution_tag = updated.resolutionTag;
+  if (updated.size !== undefined) dbPayload.size = updated.size;
+  if (updated.orientation !== undefined) dbPayload.orientation = updated.orientation;
+  if (updated.colorHex !== undefined) dbPayload.color_hex = updated.colorHex;
+  if (updated.colorName !== undefined) dbPayload.color_name = updated.colorName;
+  if (updated.uploadDate !== undefined) dbPayload.upload_date = updated.uploadDate;
+  if (updated.tags !== undefined) dbPayload.tags = updated.tags;
+  if (updated.author !== undefined) {
+    dbPayload.author = updated.author;
+    dbPayload.author_name = updated.author.name;
+    dbPayload.author_avatar = updated.author.avatar;
+  }
+  if (updated.isFeatured !== undefined) dbPayload.is_featured = updated.isFeatured;
+  if (updated.isWallpaperOfTheDay !== undefined) {
+    dbPayload.is_wallpaper_of_the_day = updated.isWallpaperOfTheDay;
+  }
+  if (updated.isAIGenerated !== undefined) dbPayload.is_ai_generated = updated.isAIGenerated;
+  if (updated.aspectRatio !== undefined) dbPayload.aspect_ratio = updated.aspectRatio;
+
+  if (Object.keys(dbPayload).length === 0) {
+    throw new Error('No wallpaper fields were provided for update.');
+  }
+
+  const { data, error } = await client
+    .from('wallpapers')
+    .update(dbPayload)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.warn('DB Update notice:', error.message || error);
+    throw new Error(`Database update failed: ${error.message}`);
+  }
+
+  return mapDbRowToWallpaper(data);
+}
+
 // Update wallpaper stats (downloads, views, favorites)
 export async function incrementStatsInSupabase(
   id: string,
