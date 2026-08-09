@@ -4,6 +4,9 @@ import {
   CloudUpload,
   Upload,
   Trash2,
+  Pencil,
+  X,
+  Save,
   FolderOpen,
   CheckCircle2,
   Layers,
@@ -26,6 +29,7 @@ export const AdminDashboard: React.FC = () => {
     addWallpaper,
     uploadWallpaperWithFile,
     deleteWallpaper,
+    editWallpaper,
     addToast,
     user
   } = useApp();
@@ -50,6 +54,10 @@ export const AdminDashboard: React.FC = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Wallpaper edit modal state
+  const [editingWallpaper, setEditingWallpaper] = useState<Wallpaper | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editDraft, setEditDraft] = useState<Partial<Wallpaper>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Analytics totals
@@ -71,6 +79,49 @@ export const AdminDashboard: React.FC = () => {
       const objectUrl = URL.createObjectURL(file);
       setPreviewUrl(objectUrl);
       addToast(`Selected file "${file.name}" for Supabase Storage`, 'info');
+    }
+  };
+
+  const openEditWallpaper = (wp: Wallpaper) => {
+    setEditingWallpaper(wp);
+    setEditDraft({
+      title: wp.title,
+      description: wp.description,
+      category: wp.category,
+      resolution: wp.resolution,
+      resolutionTag: wp.resolutionTag,
+      orientation: wp.orientation,
+      aspectRatio: wp.aspectRatio,
+      size: wp.size,
+      tags: [...wp.tags],
+      colorHex: [...wp.colorHex],
+      colorName: wp.colorName || '',
+      isFeatured: Boolean(wp.isFeatured),
+      isWallpaperOfTheDay: Boolean(wp.isWallpaperOfTheDay),
+      isAIGenerated: Boolean(wp.isAIGenerated),
+      author: { ...wp.author },
+    });
+  };
+
+  const closeEditWallpaper = () => {
+    if (isSavingEdit) return;
+    setEditingWallpaper(null);
+    setEditDraft({});
+  };
+
+  const handleEditSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingWallpaper) return;
+
+    setIsSavingEdit(true);
+    try {
+      await editWallpaper(editingWallpaper.id, editDraft);
+      setEditingWallpaper(null);
+      setEditDraft({});
+    } catch (err) {
+      // AppContext displays the error toast.
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -483,6 +534,14 @@ export const AdminDashboard: React.FC = () => {
                 </div>
 
                 <button
+                  onClick={() => openEditWallpaper(wp)}
+                  className="p-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 transition-colors"
+                  title="Edit wallpaper"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+
+                <button
                   onClick={() => deleteWallpaper(wp.id)}
                   className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-colors"
                   title="Delete wallpaper"
@@ -494,6 +553,107 @@ export const AdminDashboard: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* Edit Wallpaper Modal */}
+      {editingWallpaper && (
+        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <form
+            onSubmit={handleEditSave}
+            className="w-full max-w-4xl max-h-[90vh] overflow-y-auto glass-panel rounded-3xl border border-slate-700 bg-[#0B1220] shadow-2xl p-6 sm:p-8"
+          >
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-sky-400">Wallpaper Editor</p>
+                <h2 className="text-2xl font-extrabold text-white mt-1">Edit Wallpaper</h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Changes are saved directly to Supabase. Views, downloads and favorites are preserved.
+                </p>
+              </div>
+              <button type="button" onClick={closeEditWallpaper} className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300" title="Close editor">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Title</label>
+                <input required value={String(editDraft.title ?? '')} onChange={(e) => setEditDraft((p) => ({ ...p, title: e.target.value }))} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Author</label>
+                <input value={String(editDraft.author?.name ?? '')} onChange={(e) => setEditDraft((p) => ({ ...p, author: { ...(p.author || editingWallpaper.author), name: e.target.value } }))} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-white" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Description</label>
+                <textarea rows={3} value={String(editDraft.description ?? '')} onChange={(e) => setEditDraft((p) => ({ ...p, description: e.target.value }))} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Category</label>
+                <select value={editDraft.category} onChange={(e) => setEditDraft((p) => ({ ...p, category: e.target.value as CategoryName }))} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-white">
+                  {CATEGORIES_DATA.map((cat) => <option key={cat.name} value={cat.name}>{cat.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Resolution Tag</label>
+                <select value={editDraft.resolutionTag} onChange={(e) => setEditDraft((p) => ({ ...p, resolutionTag: e.target.value as ResolutionOption }))} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-white">
+                  {(['1080p', '1440p', '4K', '8K', 'Mobile', 'Tablet', 'Desktop'] as ResolutionOption[]).map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Resolution</label>
+                <input value={String(editDraft.resolution ?? '')} onChange={(e) => setEditDraft((p) => ({ ...p, resolution: e.target.value }))} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Orientation</label>
+                <select value={editDraft.orientation} onChange={(e) => setEditDraft((p) => ({ ...p, orientation: e.target.value as OrientationType }))} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-white">
+                  <option value="landscape">Landscape</option>
+                  <option value="portrait">Portrait</option>
+                  <option value="square">Square</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Aspect Ratio</label>
+                <input value={String(editDraft.aspectRatio ?? '')} onChange={(e) => setEditDraft((p) => ({ ...p, aspectRatio: e.target.value }))} placeholder="16:9" className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-2">File Size</label>
+                <input value={String(editDraft.size ?? '')} onChange={(e) => setEditDraft((p) => ({ ...p, size: e.target.value }))} placeholder="5.2 MB" className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-white" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Color Name</label>
+                <input value={String(editDraft.colorName ?? '')} onChange={(e) => setEditDraft((p) => ({ ...p, colorName: e.target.value }))} placeholder="Blue" className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-white" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Tags</label>
+                <input value={(editDraft.tags || []).join(', ')} onChange={(e) => setEditDraft((p) => ({ ...p, tags: e.target.value.split(',').map((t) => t.trim()).filter(Boolean) }))} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-white" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Color Palette</label>
+                <input value={(editDraft.colorHex || []).join(', ')} onChange={(e) => setEditDraft((p) => ({ ...p, colorHex: e.target.value.split(',').map((c) => c.trim()).filter(Boolean) }))} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-white font-mono" />
+              </div>
+              <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <label className="flex items-center gap-3 rounded-xl bg-slate-900 border border-slate-800 p-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={Boolean(editDraft.isFeatured)} onChange={(e) => setEditDraft((p) => ({ ...p, isFeatured: e.target.checked }))} /> Featured
+                </label>
+                <label className="flex items-center gap-3 rounded-xl bg-slate-900 border border-slate-800 p-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={Boolean(editDraft.isWallpaperOfTheDay)} onChange={(e) => setEditDraft((p) => ({ ...p, isWallpaperOfTheDay: e.target.checked }))} /> Wallpaper of the Day
+                </label>
+                <label className="flex items-center gap-3 rounded-xl bg-slate-900 border border-slate-800 p-3 text-sm text-slate-200">
+                  <input type="checkbox" checked={Boolean(editDraft.isAIGenerated)} onChange={(e) => setEditDraft((p) => ({ ...p, isAIGenerated: e.target.checked }))} /> AI Generated
+                </label>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-7 pt-5 border-t border-slate-800">
+              <button type="button" onClick={closeEditWallpaper} disabled={isSavingEdit} className="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm disabled:opacity-50">Cancel</button>
+              <button type="submit" disabled={isSavingEdit} className="px-5 py-3 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                {isSavingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {isSavingEdit ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
