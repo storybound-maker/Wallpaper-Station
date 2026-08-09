@@ -19,7 +19,8 @@ import {
   HelpCircle,
   Sun,
   Moon,
-  RotateCcw
+  RotateCcw,
+  LogIn
 } from 'lucide-react';
 import { useApp, PageView } from '../context/AppContext';
 import { JoinModal } from './JoinModal';
@@ -29,7 +30,7 @@ export const Navbar: React.FC = () => {
     activePage,
     setActivePage,
     user,
-    setUser,
+    signOut,
     triggerSearch,
     filters,
     theme,
@@ -40,6 +41,7 @@ export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [joinModalOpen, setJoinModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signin');
   const [quickSearch, setQuickSearch] = useState(filters.searchQuery);
 
   const handleQuickSearchSubmit = (e: React.FormEvent) => {
@@ -50,16 +52,25 @@ export const Navbar: React.FC = () => {
     }
   };
 
-  const navItems: { id: PageView; label: string; icon: React.FC<{ className?: string }>; badge?: string | number }[] = [
+  const allNavItems: { id: PageView; label: string; icon: React.FC<{ className?: string }>; badge?: string | number; adminOnly?: boolean }[] = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'search', label: 'Explore', icon: Compass },
     { id: 'categories', label: 'Categories', icon: Grid },
     { id: 'trending', label: 'Trending', icon: TrendingUp },
     { id: 'collections', label: 'Collections', icon: FolderHeart },
     { id: 'favorites', label: 'Favorites', icon: Heart, badge: user.favoriteIds.length > 0 ? user.favoriteIds.length : undefined },
-    { id: 'admin', label: 'Upload', icon: Upload },
+    { id: 'admin', label: 'Upload', icon: Upload, adminOnly: true },
     { id: 'contact', label: 'Request', icon: HelpCircle },
   ];
+
+  // Filter out admin items for non-admins
+  const navItems = allNavItems.filter((item) => !item.adminOnly || user.isAdmin);
+
+  const openAuthModal = (mode: 'signin' | 'signup') => {
+    setAuthModalMode(mode);
+    setJoinModalOpen(true);
+    setProfileDropdownOpen(false);
+  };
 
   return (
     <>
@@ -134,12 +145,12 @@ export const Navbar: React.FC = () => {
             })}
           </nav>
 
-          {/* Right Actions: Theme Toggle, Join Button, Admin Suite & User Profile */}
+          {/* Right Actions */}
           <div className="flex items-center gap-2.5 shrink-0">
-            {/* Day / Night Theme Toggle Button */}
+            {/* Theme Toggle Button */}
             <button
               onClick={toggleTheme}
-              title={theme === 'dark' ? 'Switch to Day Mode (Light Theme)' : 'Switch to Night Mode (Dark Theme)'}
+              title={theme === 'dark' ? 'Switch to Day Mode' : 'Switch to Night Mode'}
               className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all duration-300 flex items-center gap-2 shadow-sm ${
                 theme === 'dark'
                   ? 'bg-slate-900/90 border-slate-700/80 text-amber-400 hover:bg-slate-800 hover:border-amber-400/50'
@@ -159,143 +170,149 @@ export const Navbar: React.FC = () => {
               )}
             </button>
 
-            {/* Join Button */}
-            <button
-              onClick={() => setJoinModalOpen(true)}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-md shadow-sky-500/20 transition-all hover:scale-105 active:scale-95"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Join</span>
-            </button>
-
-            {/* Admin Dashboard CTA */}
-            <button
-              onClick={() => setActivePage('admin')}
-              className={`hidden sm:flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 ${
-                activePage === 'admin'
-                  ? 'bg-sky-500/20 text-sky-400 border-sky-500/40'
-                  : 'bg-slate-900/60 text-slate-300 border-slate-800 hover:border-slate-700 hover:bg-slate-800/60'
-              }`}
-            >
-              <ShieldCheck className="w-4 h-4 text-sky-400" />
-              <span>Admin Suite</span>
-            </button>
-
-            {/* User Profile Menu */}
-            <div className="relative">
+            {/* Admin Suite Button - SHOWN ONLY IF ADMINISTRATOR UID */}
+            {user.isAdmin && (
               <button
-                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                className="flex items-center gap-2 p-1 rounded-full hover:ring-2 hover:ring-sky-500/40 transition-all"
+                onClick={() => setActivePage('admin')}
+                className={`hidden sm:flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 ${
+                  activePage === 'admin'
+                    ? 'bg-sky-500/20 text-sky-400 border-sky-500/40'
+                    : 'bg-slate-900/60 text-slate-300 border-slate-800 hover:border-slate-700 hover:bg-slate-800/60'
+                }`}
               >
-                <img
-                  src={user.avatar}
-                  alt={user.name}
-                  referrerPolicy="no-referrer"
-                  className="w-9 h-9 rounded-full object-cover border border-slate-700"
-                />
+                <ShieldCheck className="w-4 h-4 text-sky-400" />
+                <span>Admin Suite</span>
               </button>
+            )}
 
-              {/* Profile Dropdown */}
-              <AnimatePresence>
-                {profileDropdownOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 mt-3 w-64 glass-panel rounded-2xl p-2 shadow-2xl border border-slate-700/80 z-50 text-slate-200"
-                  >
-                    <div className="p-3 border-b border-slate-800 flex items-center gap-3">
-                      <img
-                        src={user.avatar}
-                        alt={user.name}
-                        referrerPolicy="no-referrer"
-                        className="w-10 h-10 rounded-full object-cover border border-sky-500/40"
-                      />
-                      <div className="overflow-hidden">
-                        <p className="text-sm font-semibold text-white truncate">{user.name}</p>
-                        <p className="text-xs text-slate-400 truncate">{user.email}</p>
+            {/* Authentication Buttons (When Logged Out) */}
+            {!user.isLoggedIn ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => openAuthModal('signin')}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 transition-all"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Sign In</span>
+                </button>
+
+                <button
+                  onClick={() => openAuthModal('signup')}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-md shadow-sky-500/20 transition-all hover:scale-105 active:scale-95"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Create Account</span>
+                  <span className="sm:hidden">Sign Up</span>
+                </button>
+              </div>
+            ) : (
+              /* User Profile Menu (When Logged In) */
+              <div className="relative">
+                <button
+                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                  className="flex items-center gap-2 p-1 rounded-full hover:ring-2 hover:ring-sky-500/40 transition-all"
+                >
+                  <img
+                    src={user.avatar}
+                    alt={user.name}
+                    referrerPolicy="no-referrer"
+                    className="w-9 h-9 rounded-full object-cover border border-slate-700"
+                  />
+                </button>
+
+                {/* Profile Dropdown */}
+                <AnimatePresence>
+                  {profileDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 mt-3 w-64 glass-panel rounded-2xl p-2 shadow-2xl border border-slate-700/80 z-50 text-slate-200 bg-[#0B1220]/95"
+                    >
+                      <div className="p-3 border-b border-slate-800 flex items-center gap-3">
+                        <img
+                          src={user.avatar}
+                          alt={user.name}
+                          referrerPolicy="no-referrer"
+                          className="w-10 h-10 rounded-full object-cover border border-sky-500/40"
+                        />
+                        <div className="overflow-hidden">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-semibold text-white truncate">{user.name}</p>
+                            {user.isAdmin && (
+                              <ShieldCheck className="w-3.5 h-3.5 text-sky-400 shrink-0" title="Administrator" />
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="py-2 space-y-1">
-                      <button
-                        onClick={() => {
-                          setActivePage('profile');
-                          setProfileDropdownOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors"
-                      >
-                        <UserIcon className="w-4 h-4 text-sky-400" />
-                        <span>My Account & Downloads</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setActivePage('favorites');
-                          setProfileDropdownOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors"
-                      >
-                        <Heart className="w-4 h-4 text-rose-400" />
-                        <span>Saved Favorites ({user.favoriteIds.length})</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setActivePage('admin');
-                          setProfileDropdownOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors"
-                      >
-                        <Upload className="w-4 h-4 text-indigo-400" />
-                        <span>Upload Wallpaper</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          toggleTheme();
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-amber-400 hover:bg-amber-500/10 transition-colors"
-                      >
-                        {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-sky-400" />}
-                        <span>{theme === 'dark' ? 'Switch to Day Mode' : 'Switch to Night Mode'}</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          resetToDefaultWallpapers();
-                          setProfileDropdownOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors"
-                      >
-                        <RotateCcw className="w-4 h-4 text-slate-400" />
-                        <span>Reset Default Wallpapers</span>
-                      </button>
-                    </div>
+                      <div className="py-2 space-y-1">
+                        <button
+                          onClick={() => {
+                            setActivePage('profile');
+                            setProfileDropdownOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors"
+                        >
+                          <UserIcon className="w-4 h-4 text-sky-400" />
+                          <span>My Account</span>
+                        </button>
 
-                    <div className="pt-1 border-t border-slate-800">
-                      <button
-                        onClick={() => {
-                          setJoinModalOpen(true);
-                          setProfileDropdownOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-sky-400 hover:bg-sky-500/10 transition-colors"
-                      >
-                        <UserPlus className="w-4 h-4" />
-                        <span>Join / Switch Account</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setUser((prev) => ({ ...prev, isLoggedIn: !prev.isLoggedIn }));
-                          setProfileDropdownOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-rose-400 hover:bg-rose-500/10 transition-colors"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        <span>{user.isLoggedIn ? 'Sign Out' : 'Sign In'}</span>
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                        <button
+                          onClick={() => {
+                            setActivePage('favorites');
+                            setProfileDropdownOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors"
+                        >
+                          <Heart className="w-4 h-4 text-rose-400" />
+                          <span>Saved Favorites ({user.favoriteIds.length})</span>
+                        </button>
+
+                        {/* Admin Only Upload Link */}
+                        {user.isAdmin && (
+                          <button
+                            onClick={() => {
+                              setActivePage('admin');
+                              setProfileDropdownOpen(false);
+                            }}
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-slate-300 hover:text-white hover:bg-slate-800/70 transition-colors"
+                          >
+                            <Upload className="w-4 h-4 text-indigo-400" />
+                            <span>Upload Wallpaper (Admin)</span>
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => {
+                            toggleTheme();
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-amber-400 hover:bg-amber-500/10 transition-colors"
+                        >
+                          {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-sky-400" />}
+                          <span>{theme === 'dark' ? 'Switch to Day Mode' : 'Switch to Night Mode'}</span>
+                        </button>
+                      </div>
+
+                      <div className="pt-1 border-t border-slate-800">
+                        <button
+                          onClick={() => {
+                            signOut();
+                            setProfileDropdownOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-rose-400 hover:bg-rose-500/10 transition-colors"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          <span>Sign Out</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
 
             {/* Mobile Menu Toggle Button */}
             <button
@@ -354,35 +371,58 @@ export const Navbar: React.FC = () => {
               </div>
 
               <div className="pt-2 border-t border-slate-800 flex justify-between items-center">
-                <button
-                  onClick={() => {
-                    setJoinModalOpen(true);
-                    setMobileMenuOpen(false);
-                  }}
-                  className="flex items-center gap-2 text-xs font-semibold text-sky-400"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  <span>Join Wallpaper Station</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setActivePage('admin');
-                    setMobileMenuOpen(false);
-                  }}
-                  className="flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white"
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Admin Suite</span>
-                </button>
+                {!user.isLoggedIn ? (
+                  <div className="flex items-center gap-2 w-full justify-between">
+                    <button
+                      onClick={() => {
+                        openAuthModal('signin');
+                        setMobileMenuOpen(false);
+                      }}
+                      className="flex items-center gap-2 text-xs font-semibold text-sky-400"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      <span>Sign In</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        openAuthModal('signup');
+                        setMobileMenuOpen(false);
+                      }}
+                      className="flex items-center gap-2 text-xs font-semibold text-indigo-400"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      <span>Create Account</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-xs text-slate-400 truncate max-w-[180px]">
+                      {user.email}
+                    </span>
+                    <button
+                      onClick={() => {
+                        signOut();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-rose-400"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </header>
 
-      {/* Join Modal Component */}
-      <JoinModal isOpen={joinModalOpen} onClose={() => setJoinModalOpen(false)} />
+      {/* Auth Modal Component */}
+      <JoinModal
+        isOpen={joinModalOpen}
+        onClose={() => setJoinModalOpen(false)}
+        initialMode={authModalMode}
+      />
     </>
   );
 };
-

@@ -1,32 +1,24 @@
 import React, { useState, useRef } from 'react';
 import {
   ShieldCheck,
-  Upload,
-  Layers,
-  Eye,
-  Download,
-  HardDrive,
-  Lock,
-  Unlock,
-  CheckCircle2,
-  FolderOpen,
-  Database,
-  RefreshCw,
-  Copy,
-  Check,
-  AlertTriangle,
-  Trash2,
-  Sparkles,
-  Server,
   CloudUpload,
+  Upload,
+  Trash2,
+  FolderOpen,
+  CheckCircle2,
+  Layers,
+  Download,
+  Eye,
+  HardDrive,
   Loader2,
-  Key,
-  Settings
+  Lock,
+  ShieldAlert
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { CategoryName, ResolutionOption, OrientationType } from '../types';
+import { CategoryName, OrientationType, ResolutionOption, Wallpaper } from '../types';
 import { CATEGORIES_DATA } from '../data/wallpapers';
-import { SUPABASE_SQL_SCHEMA, getSupabaseConfig, resetSupabaseClientInstance } from '../lib/supabase';
+import { ADMIN_SUPABASE_UID } from '../lib/supabase';
+import { JoinModal } from '../components/JoinModal';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -34,161 +26,101 @@ export const AdminDashboard: React.FC = () => {
     addWallpaper,
     uploadWallpaperWithFile,
     deleteWallpaper,
-    user,
-    setUser,
     addToast,
-    isSupabaseConnected,
-    isLoadingWallpapers,
-    wallpaperError,
-    seedSupabaseDatabase,
-    refetchWallpapers
+    user
   } = useApp();
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
 
   // Form State
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
   const [category, setCategory] = useState<CategoryName>('Cyberpunk');
   const [resolutionTag, setResolutionTag] = useState<ResolutionOption>('4K');
   const [resolution, setResolution] = useState('3840 x 2160');
   const [orientation, setOrientation] = useState<OrientationType>('landscape');
-  const [tags, setTags] = useState('Cyberpunk, 4K, Neon, City');
-  const [authorName, setAuthorName] = useState(user.name);
+  const [authorName, setAuthorName] = useState('Alex Vance');
+  const [tags, setTags] = useState('Cyberpunk, Neon, 4K, Desktop');
   const [colorHexStr, setColorHexStr] = useState('#0B1220, #38BDF8, #818CF8');
-  
-  // File upload state
+
+  // Direct URL vs Storage File State
+  const [imageUrl, setImageUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // Loading & Helper States
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
-  const [showSqlSchema, setShowSqlSchema] = useState(false);
-  const [showKeyConfig, setShowKeyConfig] = useState(false);
-  const [copiedSql, setCopiedSql] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Custom Supabase keys input
-  const currentConfig = getSupabaseConfig();
-  const [customUrlInput, setCustomUrlInput] = useState(currentConfig.url);
-  const [customKeyInput, setCustomKeyInput] = useState(currentConfig.key);
+  // Analytics totals
+  const totalDownloads = wallpapers.reduce((acc, wp) => acc + (wp.downloads || 0), 0);
+  const totalViews = wallpapers.reduce((acc, wp) => acc + (wp.views || 0), 0);
 
-  const handleSaveCustomKeys = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (customUrlInput.trim()) {
-      localStorage.setItem('ws_supabase_url', customUrlInput.trim());
-    } else {
-      localStorage.removeItem('ws_supabase_url');
-    }
-
-    if (customKeyInput.trim()) {
-      localStorage.setItem('ws_supabase_key', customKeyInput.trim());
-    } else {
-      localStorage.removeItem('ws_supabase_key');
-    }
-
-    resetSupabaseClientInstance();
-    refetchWallpapers();
-    addToast('Updated Supabase client credentials!', 'success');
-    setShowKeyConfig(false);
-  };
-
-  // Handle file selection from device
   const handleDeviceFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      addToast('Please select a valid image file (PNG, JPG, WEBP, AVIF)', 'error');
-      return;
-    }
-
-    setSelectedFile(file);
-    setSelectedFileName(file.name);
-
-    if (!title) {
-      const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-      setTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setPreviewUrl(event.target.result as string);
-        setImageUrl(''); // Clear manual URL if file selected
-        addToast(`Image "${file.name}" selected for Supabase Storage upload`, 'success');
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        addToast('Please select a valid image file (JPG, PNG, WEBP)', 'error');
+        return;
       }
-    };
-    reader.readAsDataURL(file);
-  };
 
-  const handleCopySql = () => {
-    navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
-    setCopiedSql(true);
-    addToast('Supabase SQL schema copied to clipboard!', 'success');
-    setTimeout(() => setCopiedSql(false), 3000);
-  };
+      setSelectedFile(file);
+      setSelectedFileName(file.name);
+      setImageUrl('');
 
-  const handleSeedDatabase = async () => {
-    setIsSeeding(true);
-    try {
-      await seedSupabaseDatabase();
-    } finally {
-      setIsSeeding(false);
+      const objectUrl = URL.createObjectURL(file);
+      setPreviewUrl(objectUrl);
+      addToast(`Selected file "${file.name}" for Supabase Storage`, 'info');
     }
   };
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) {
-      addToast('Please enter a wallpaper title', 'error');
+
+    if (!user.isAdmin) {
+      addToast('Only the administrator account can upload wallpapers.', 'error');
       return;
     }
 
-    if (!selectedFile && !imageUrl.trim()) {
-      addToast('Please select an image file to upload or paste an image URL', 'error');
+    if (!selectedFile && !imageUrl) {
+      addToast('Please select an image file to upload OR provide a direct image URL.', 'error');
       return;
     }
-
-    const tagArray = tags.split(',').map((t) => t.trim()).filter(Boolean);
-    const colorArray = colorHexStr.split(',').map((c) => c.trim()).filter(Boolean);
-
-    const metadata = {
-      title: title.trim(),
-      description: description.trim() || 'A high definition wallpaper stored in Supabase.',
-      category,
-      resolutionTag,
-      resolution,
-      size: selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '5.6 MB',
-      orientation,
-      colorHex: colorArray.length > 0 ? colorArray : ['#0B1220', '#38BDF8', '#818CF8'],
-      colorName: 'Blue',
-      tags: tagArray.length > 0 ? tagArray : [category, resolutionTag],
-      author: {
-        name: authorName.trim() || user.name || 'Station Creator',
-        avatar: user.avatar,
-      },
-      aspectRatio: orientation === 'portrait' ? '9:16' : '16:9',
-    };
 
     setIsSubmitting(true);
 
+    const parsedTags = tags.split(',').map((t) => t.trim()).filter(Boolean);
+    const parsedColors = colorHexStr.split(',').map((c) => c.trim()).filter(Boolean);
+
+    const metadata: Omit<Wallpaper, 'id' | 'views' | 'downloads' | 'favorites' | 'uploadDate' | 'url' | 'thumbnailUrl'> = {
+      title,
+      description,
+      category,
+      resolutionTag,
+      resolution,
+      orientation,
+      tags: parsedTags,
+      colorHex: parsedColors,
+      size: '5.2 MB',
+      aspectRatio: orientation === 'portrait' ? '9:16' : '16:9',
+      author: {
+        name: authorName || 'Alex Vance',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop',
+      },
+    };
+
     try {
       if (selectedFile) {
-        // Upload file to Supabase Storage 'wallpapers' bucket & save metadata to 'wallpapers' table
         await uploadWallpaperWithFile(selectedFile, metadata);
       } else {
-        // Save image URL to Supabase database table
         await addWallpaper({
           ...metadata,
-          url: imageUrl.trim(),
-          thumbnailUrl: imageUrl.trim(),
+          url: imageUrl,
+          thumbnailUrl: imageUrl,
         });
       }
 
-      // Reset Form
+      // Reset form on success
       setTitle('');
       setDescription('');
       setImageUrl('');
@@ -196,16 +128,52 @@ export const AdminDashboard: React.FC = () => {
       setSelectedFileName(null);
       setPreviewUrl(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
-      setTags('Cyberpunk, 4K, Neon');
     } catch (err: any) {
-      console.error('Upload error:', err);
+      // Error toast is already displayed in AppContext
+      console.error('Upload form handler caught error:', err);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const totalDownloads = wallpapers.reduce((acc, wp) => acc + wp.downloads, 0);
-  const totalViews = wallpapers.reduce((acc, wp) => acc + wp.views, 0);
+  // Access Control: Strict Administrator Check
+  if (!user.isAdmin) {
+    return (
+      <div className="max-w-xl mx-auto py-16 px-4 text-center space-y-6">
+        <div className="w-16 h-16 rounded-3xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center mx-auto">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+
+        <div className="space-y-2">
+          <h2 className="text-2xl font-extrabold text-white">Administrator Access Restricted</h2>
+          <p className="text-sm text-slate-400 leading-relaxed">
+            The Admin Suite and Upload controls are restricted exclusively to the authenticated Supabase administrator account.
+          </p>
+        </div>
+
+        <div className="glass-panel p-4 rounded-2xl border border-slate-800 text-xs font-mono text-slate-300 break-all bg-slate-950/60">
+          <span className="text-slate-500 block text-[10px] uppercase font-sans font-bold mb-1">
+            Required Administrator Supabase UID
+          </span>
+          {ADMIN_SUPABASE_UID}
+        </div>
+
+        <button
+          onClick={() => setIsJoinModalOpen(true)}
+          className="py-3.5 px-6 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm shadow-xl shadow-sky-500/20 transition-all inline-flex items-center gap-2"
+        >
+          <Lock className="w-4 h-4" />
+          <span>Sign In as Administrator</span>
+        </button>
+
+        <JoinModal
+          isOpen={isJoinModalOpen}
+          onClose={() => setIsJoinModalOpen(false)}
+          initialMode="signin"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-12 max-w-5xl mx-auto">
@@ -214,7 +182,7 @@ export const AdminDashboard: React.FC = () => {
         <div className="relative z-10">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-bold uppercase tracking-wider mb-2">
             <ShieldCheck className="w-4 h-4 text-sky-400" />
-            <span>SUPABASE ADMIN & UPLOAD PORTAL</span>
+            <span>AUTHENTICATED ADMINISTRATOR SUITE</span>
           </div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Wallpaper Admin Hub</h1>
           <p className="text-slate-400 text-sm mt-1">
@@ -222,24 +190,11 @@ export const AdminDashboard: React.FC = () => {
           </p>
         </div>
 
-        {/* Toggle Admin Mode */}
-        <button
-          onClick={() => {
-            setUser((prev) => ({ ...prev, isAdmin: !prev.isAdmin }));
-            addToast(`Admin mode ${!user.isAdmin ? 'enabled' : 'disabled'}`, 'info');
-          }}
-          className={`relative z-10 px-5 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 border transition-all ${
-            user.isAdmin
-              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-              : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-          }`}
-        >
-          {user.isAdmin ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-          <span>{user.isAdmin ? 'Admin Mode Active' : 'Enable Admin Mode'}</span>
-        </button>
+        <div className="px-4 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4" />
+          <span>Verified Admin UID</span>
+        </div>
       </div>
-
-
 
       {/* Analytics Counter Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -281,223 +236,213 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Admin Upload Form */}
-      {!user.isAdmin ? (
-        <div className="glass-panel rounded-3xl p-8 border border-amber-500/30 text-center space-y-4">
-          <Lock className="w-10 h-10 text-amber-400 mx-auto" />
-          <h3 className="text-xl font-bold text-white">Creator Mode Required</h3>
-          <p className="text-slate-400 text-sm max-w-md mx-auto">
-            Upload permission is restricted to admin creators. Enable Creator Mode at the top right to access the upload form.
-          </p>
+      <form onSubmit={handleUploadSubmit} className="glass-panel rounded-3xl p-6 sm:p-10 border border-slate-700/80 space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <CloudUpload className="w-5 h-5 text-sky-400" />
+            <span>Upload Wallpaper to Supabase Storage & Database</span>
+          </h2>
+          <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
+            Admin Upload System
+          </span>
         </div>
-      ) : (
-        <form onSubmit={handleUploadSubmit} className="glass-panel rounded-3xl p-6 sm:p-10 border border-slate-700/80 space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <CloudUpload className="w-5 h-5 text-sky-400" />
-              <span>Upload Wallpaper to Supabase Storage & Database</span>
-            </h2>
-            <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
-              Admin Upload System
-            </span>
-          </div>
 
-          {/* Supabase Storage File Picker Drop Zone */}
-          <div className="space-y-2">
-            <label className="block text-xs font-bold uppercase text-slate-300">
-              Select Image File for Supabase Storage *
-            </label>
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-slate-700 hover:border-sky-500 rounded-2xl p-8 text-center bg-slate-900/60 hover:bg-slate-900 cursor-pointer transition-all duration-300 group space-y-3"
-            >
-              <input
-                type="file"
-                ref={fileInputRef}
-                accept="image/*"
-                onChange={handleDeviceFileSelect}
-                className="hidden"
-              />
-              <div className="w-14 h-14 rounded-2xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
-                <FolderOpen className="w-7 h-7" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white">
-                  {selectedFileName ? (
-                    <span className="text-emerald-400 flex items-center justify-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4" /> Selected: {selectedFileName}
-                    </span>
-                  ) : (
-                    'Click to browse device storage or photos'
-                  )}
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Uploads directly to Supabase Storage bucket <code className="text-sky-300">"wallpapers"</code>
-                </p>
-              </div>
+        {/* Supabase Storage File Picker Drop Zone */}
+        <div className="space-y-2">
+          <label className="block text-xs font-bold uppercase text-slate-300">
+            Select Image File for Supabase Storage *
+          </label>
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="border-2 border-dashed border-slate-700 hover:border-sky-500 rounded-2xl p-8 text-center bg-slate-900/60 hover:bg-slate-900 cursor-pointer transition-all duration-300 group space-y-3"
+          >
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              onChange={handleDeviceFileSelect}
+              className="hidden"
+            />
+            <div className="w-14 h-14 rounded-2xl bg-sky-500/10 text-sky-400 border border-sky-500/20 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+              <FolderOpen className="w-7 h-7" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white">
+                {selectedFileName ? (
+                  <span className="text-emerald-400 flex items-center justify-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4" /> Selected: {selectedFileName}
+                  </span>
+                ) : (
+                  'Click to browse device storage or photos'
+                )}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                Uploads directly to Supabase Storage bucket <code className="text-sky-300">"wallpapers"</code>
+              </p>
             </div>
           </div>
+        </div>
 
-          <div className="relative flex items-center justify-center my-4">
-            <div className="border-t border-slate-800 w-full" />
-            <span className="bg-[#0B1220] px-3 text-xs font-bold uppercase text-slate-500">OR PROVIDE DIRECT IMAGE URL</span>
-          </div>
+        <div className="relative flex items-center justify-center my-4">
+          <div className="border-t border-slate-800 w-full" />
+          <span className="bg-[#0B1220] px-3 text-xs font-bold uppercase text-slate-500">OR PROVIDE DIRECT IMAGE URL</span>
+        </div>
 
+        <div>
+          <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Direct Image Web URL</label>
+          <input
+            type="url"
+            placeholder="https://images.unsplash.com/photo-..."
+            value={imageUrl}
+            onChange={(e) => {
+              setImageUrl(e.target.value);
+              setSelectedFile(null);
+              setSelectedFileName(null);
+              setPreviewUrl(e.target.value);
+            }}
+            className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
           <div>
-            <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Direct Image Web URL</label>
+            <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Wallpaper Title *</label>
             <input
-              type="url"
-              placeholder="https://images.unsplash.com/photo-..."
-              value={imageUrl}
-              onChange={(e) => {
-                setImageUrl(e.target.value);
-                setSelectedFile(null);
-                setSelectedFileName(null);
-                setPreviewUrl(e.target.value);
-              }}
+              type="text"
+              required
+              placeholder="e.g., Neon Rain Samurai 4K"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-            <div>
-              <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Wallpaper Title *</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g., Neon Rain Samurai 4K"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Author / Creator Name</label>
-              <input
-                type="text"
-                placeholder="Your name or handle"
-                value={authorName}
-                onChange={(e) => setAuthorName(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Description</label>
-              <textarea
-                rows={2}
-                placeholder="Describe the mood, color tones, or screen setup fit..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Category *</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as CategoryName)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
-              >
-                {CATEGORIES_DATA.map((cat) => (
-                  <option key={cat.name} value={cat.name}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Target Resolution *</label>
-              <select
-                value={resolutionTag}
-                onChange={(e) => {
-                  const tag = e.target.value as ResolutionOption;
-                  setResolutionTag(tag);
-                  if (tag === '8K') setResolution('7680 x 4320');
-                  else if (tag === '4K') setResolution('3840 x 2160');
-                  else if (tag === '1440p') setResolution('2560 x 1440');
-                  else if (tag === '1080p') setResolution('1920 x 1080');
-                  else if (tag === 'Mobile') setResolution('1290 x 2796');
-                }}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
-              >
-                <option value="4K">4K (3840 x 2160)</option>
-                <option value="8K">8K (7680 x 4320)</option>
-                <option value="1440p">1440p (2560 x 1440)</option>
-                <option value="1080p">1080p (1920 x 1080)</option>
-                <option value="Mobile">Mobile (1290 x 2796)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Orientation</label>
-              <select
-                value={orientation}
-                onChange={(e) => setOrientation(e.target.value as OrientationType)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
-              >
-                <option value="landscape">Landscape (Desktop / Monitor)</option>
-                <option value="portrait">Portrait (Mobile / Phone)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Tags (Comma Separated)</label>
-              <input
-                type="text"
-                placeholder="e.g., Cyberpunk, Neon, 4K, Dark"
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Color Palette Hex Codes (Comma Separated)</label>
-              <input
-                type="text"
-                placeholder="#0B1220, #38BDF8, #818CF8"
-                value={colorHexStr}
-                onChange={(e) => setColorHexStr(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-100 focus:outline-none focus:border-sky-500 font-mono"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Author / Creator Name</label>
+            <input
+              type="text"
+              placeholder="Your name or handle"
+              value={authorName}
+              onChange={(e) => setAuthorName(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+            />
           </div>
 
-          {/* Live Preview Box */}
-          {previewUrl && (
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-              <span className="text-xs font-bold text-slate-400 block">Selected Image Preview</span>
-              <img
-                src={previewUrl}
-                alt="Upload preview"
-                referrerPolicy="no-referrer"
-                className="w-full h-56 object-cover rounded-xl"
-              />
-            </div>
-          )}
+          <div className="md:col-span-2">
+            <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Description</label>
+            <textarea
+              rows={2}
+              placeholder="Describe the mood, color tones, or screen setup fit..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+            />
+          </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm flex items-center justify-center gap-3 shadow-xl shadow-sky-500/20 transition-all hover:scale-[1.01] disabled:opacity-50"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Uploading to Supabase Storage & Database...</span>
-              </>
-            ) : (
-              <>
-                <Upload className="w-5 h-5" />
-                <span>Publish Wallpaper to Supabase</span>
-              </>
-            )}
-          </button>
-        </form>
-      )}
+          <div>
+            <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Category *</label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as CategoryName)}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
+            >
+              {CATEGORIES_DATA.map((cat) => (
+                <option key={cat.name} value={cat.name}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Target Resolution *</label>
+            <select
+              value={resolutionTag}
+              onChange={(e) => {
+                const tag = e.target.value as ResolutionOption;
+                setResolutionTag(tag);
+                if (tag === '8K') setResolution('7680 x 4320');
+                else if (tag === '4K') setResolution('3840 x 2160');
+                else if (tag === '1440p') setResolution('2560 x 1440');
+                else if (tag === '1080p') setResolution('1920 x 1080');
+                else if (tag === 'Mobile') setResolution('1290 x 2796');
+              }}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
+            >
+              <option value="4K">4K (3840 x 2160)</option>
+              <option value="8K">8K (7680 x 4320)</option>
+              <option value="1440p">1440p (2560 x 1440)</option>
+              <option value="1080p">1080p (1920 x 1080)</option>
+              <option value="Mobile">Mobile (1290 x 2796)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Orientation</label>
+            <select
+              value={orientation}
+              onChange={(e) => setOrientation(e.target.value as OrientationType)}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
+            >
+              <option value="landscape">Landscape (Desktop / Monitor)</option>
+              <option value="portrait">Portrait (Mobile / Phone)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Tags (Comma Separated)</label>
+            <input
+              type="text"
+              placeholder="e.g., Cyberpunk, Neon, 4K, Dark"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-xs font-bold uppercase text-slate-300 mb-2">Color Palette Hex Codes (Comma Separated)</label>
+            <input
+              type="text"
+              placeholder="#0B1220, #38BDF8, #818CF8"
+              value={colorHexStr}
+              onChange={(e) => setColorHexStr(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3.5 text-sm text-slate-100 focus:outline-none focus:border-sky-500 font-mono"
+            />
+          </div>
+        </div>
+
+        {/* Live Preview Box */}
+        {previewUrl && (
+          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+            <span className="text-xs font-bold text-slate-400 block">Selected Image Preview</span>
+            <img
+              src={previewUrl}
+              alt="Upload preview"
+              referrerPolicy="no-referrer"
+              className="w-full h-56 object-cover rounded-xl"
+            />
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm flex items-center justify-center gap-3 shadow-xl shadow-sky-500/20 transition-all hover:scale-[1.01] disabled:opacity-50"
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Uploading to Supabase Storage & Database...</span>
+            </>
+          ) : (
+            <>
+              <Upload className="w-5 h-5" />
+              <span>Publish Wallpaper to Supabase</span>
+            </>
+          )}
+        </button>
+      </form>
 
       {/* Database Inventory Table */}
       <div className="glass-panel rounded-3xl p-6 border border-slate-800 space-y-4">
