@@ -9,11 +9,15 @@ import {
 } from '../types';
 
 /* ============================================================
-   SUPABASE CONFIGURATION
+   ADMIN
 ============================================================ */
 
 export const ADMIN_SUPABASE_UID =
   '188791bc-6d87-4d28-8716-0f1efcad00e1';
+
+/* ============================================================
+   SUPABASE CONFIGURATION
+============================================================ */
 
 export const getSupabaseConfig = () => {
   const customUrl =
@@ -43,13 +47,13 @@ export const getSupabaseConfig = () => {
 };
 
 export const isSupabaseConfigured = (): boolean => {
-  const { url, key } = getSupabaseConfig();
+  const config = getSupabaseConfig();
 
   return Boolean(
-    url &&
-      key &&
-      url.startsWith('https://') &&
-      key.length > 20
+    config.url &&
+      config.key &&
+      config.url.startsWith('https://') &&
+      config.key.length > 20
   );
 };
 
@@ -60,22 +64,25 @@ export const isSupabaseConfigured = (): boolean => {
 let clientInstance: SupabaseClient | null = null;
 
 export const getSupabaseClient = (): SupabaseClient | null => {
-  const { url, key } = getSupabaseConfig();
+  const config = getSupabaseConfig();
 
-  if (!url || !key) {
+  if (!config.url || !config.key) {
     return null;
   }
 
-  if (!url.startsWith('https://')) {
+  if (!config.url.startsWith('https://')) {
     return null;
   }
 
-  if (key.length <= 20) {
+  if (config.key.length <= 20) {
     return null;
   }
 
   if (!clientInstance) {
-    clientInstance = createClient(url, key);
+    clientInstance = createClient(
+      config.url,
+      config.key
+    );
   }
 
   return clientInstance;
@@ -101,20 +108,19 @@ export const signInWithEmail = async (
   if (!client) {
     return {
       data: null,
-      error: new Error('Supabase is not configured.'),
+      error: new Error(
+        'Supabase is not configured.'
+      ),
     };
   }
 
-  const { data, error } =
+  const result =
     await client.auth.signInWithPassword({
       email,
       password,
     });
 
-  return {
-    data,
-    error,
-  };
+  return result;
 };
 
 export const signUpWithEmail = async (
@@ -130,11 +136,13 @@ export const signUpWithEmail = async (
         user: null,
         session: null,
       },
-      error: new Error('Supabase is not configured.'),
+      error: new Error(
+        'Supabase is not configured.'
+      ),
     };
   }
 
-  const { data, error } =
+  const result =
     await client.auth.signUp({
       email,
       password,
@@ -146,24 +154,23 @@ export const signUpWithEmail = async (
       },
     });
 
-  return {
-    data,
-    error,
-  };
+  return result;
 };
 
 export const signOutUser = async () => {
   const client = getSupabaseClient();
 
   if (!client) {
-    throw new Error('Supabase is not configured.');
+    throw new Error(
+      'Supabase is not configured.'
+    );
   }
 
-  const { error } =
+  const result =
     await client.auth.signOut();
 
-  if (error) {
-    throw error;
+  if (result.error) {
+    throw result.error;
   }
 };
 
@@ -174,17 +181,19 @@ export const sendPasswordResetEmail = async (
 
   if (!client) {
     return {
-      error: new Error('Supabase is not configured.'),
+      error: new Error(
+        'Supabase is not configured.'
+      ),
     };
   }
 
-  const { error } =
+  const result =
     await client.auth.resetPasswordForEmail(
       email
     );
 
   return {
-    error,
+    error: result.error,
   };
 };
 
@@ -277,8 +286,9 @@ export function mapDbRowToWallpaper(
         : typeof row.tags === 'string'
           ? row.tags
               .split(',')
-              .map((tag: string) =>
-                tag.trim()
+              .map(
+                (tag: string) =>
+                  tag.trim()
               )
               .filter(Boolean)
           : [],
@@ -348,7 +358,8 @@ export function mapDbRowToWallpaper(
 export function mapWallpaperToDbPayload(
   wp: Partial<Wallpaper>
 ) {
-  const imageUrl = wp.url || '';
+  const imageUrl =
+    wp.url || '';
 
   return {
     title:
@@ -467,32 +478,32 @@ export async function fetchWallpapersFromSupabase(): Promise<
     );
   }
 
-  const {
-    data,
-    error,
-  } = await client
-    .from('wallpapers')
-    .select('*')
-    .order('created_at', {
-      ascending: false,
-    });
+  const result =
+    await client
+      .from('wallpapers')
+      .select('*')
+      .order('created_at', {
+        ascending: false,
+      });
 
-  if (error) {
+  if (result.error) {
     console.error(
       'Supabase fetch error:',
-      error
+      result.error
     );
 
-    throw error;
+    throw result.error;
   }
 
-  return (data || []).map(
+  return (
+    result.data || []
+  ).map(
     mapDbRowToWallpaper
   );
 }
 
 /* ============================================================
-   UPLOAD FILE TO STORAGE + DATABASE
+   UPLOAD WALLPAPER FILE
 ============================================================ */
 
 export async function uploadWallpaperFileAndSave({
@@ -500,6 +511,7 @@ export async function uploadWallpaperFileAndSave({
   metadata,
 }: {
   file: File;
+
   metadata: Omit<
     Wallpaper,
     | 'id'
@@ -520,19 +532,25 @@ export async function uploadWallpaperFileAndSave({
     );
   }
 
-  const BUCKET_NAME =
+  const bucketName =
     'wallpapers';
 
+  const fileParts =
+    file.name.split('.');
+
   const fileExt =
-    file.name
-      .split('.')
-      .pop()
-      ?.toLowerCase() ||
-    'jpg';
+    fileParts.length > 1
+      ? fileParts[
+          fileParts.length - 1
+        ].toLowerCase()
+      : 'jpg';
 
   const safeBaseName =
     file.name
-      .replace(/\.[^/.]+$/, '')
+      .replace(
+        /\.[^/.]+$/,
+        ''
+      )
       .replace(
         /[^a-zA-Z0-9-_]/g,
         '-'
@@ -542,10 +560,19 @@ export async function uploadWallpaperFileAndSave({
   const randomId =
     Math.random()
       .toString(36)
-      .substring(2, 8);
+      .substring(
+        2,
+        8
+      );
+
+  /*
+   * IMPORTANT:
+   * This intentionally uses string concatenation
+   * instead of a template literal.
+   */
 
   const fileName =
-    Date.now() +
+    String(Date.now()) +
     '-' +
     randomId +
     '-' +
@@ -557,47 +584,50 @@ export async function uploadWallpaperFileAndSave({
     'wallpapers/' +
     fileName;
 
-  /* Upload image */
+  /* Upload */
 
-  const {
-    error: uploadError,
-  } = await client.storage
-    .from(BUCKET_NAME)
-    .upload(
-      filePath,
-      file,
-      {
-        cacheControl: '3600',
-        upsert: false,
-        contentType:
-          file.type ||
-          'image/jpeg',
-      }
-    );
+  const uploadResult =
+    await client.storage
+      .from(bucketName)
+      .upload(
+        filePath,
+        file,
+        {
+          cacheControl:
+            '3600',
 
-  if (uploadError) {
+          upsert:
+            false,
+
+          contentType:
+            file.type ||
+            'image/jpeg',
+        }
+      );
+
+  if (uploadResult.error) {
     console.error(
       'Supabase Storage upload error:',
-      uploadError
+      uploadResult.error
     );
 
     throw new Error(
-      `Storage upload failed: ${uploadError.message}`
+      'Storage upload failed: ' +
+        uploadResult.error.message
     );
   }
 
-  /* Get public URL */
+  /* Public URL */
 
-  const {
-    data: publicUrlData,
-  } = client.storage
-    .from(BUCKET_NAME)
-    .getPublicUrl(
-      filePath
-    );
+  const publicResult =
+    client.storage
+      .from(bucketName)
+      .getPublicUrl(
+        filePath
+      );
 
   const publicUrl =
-    publicUrlData?.publicUrl ||
+    publicResult.data?.publicUrl ||
     '';
 
   if (!publicUrl) {
@@ -606,22 +636,26 @@ export async function uploadWallpaperFileAndSave({
     );
   }
 
-  /* Save database metadata */
+  /* Database payload */
 
   const dbPayload =
     mapWallpaperToDbPayload({
       ...metadata,
 
-      url: publicUrl,
+      url:
+        publicUrl,
 
       thumbnailUrl:
         publicUrl,
 
-      views: 0,
+      views:
+        0,
 
-      downloads: 0,
+      downloads:
+        0,
 
-      favorites: 0,
+      favorites:
+        0,
 
       uploadDate:
         new Date()
@@ -629,29 +663,31 @@ export async function uploadWallpaperFileAndSave({
           .split('T')[0],
     });
 
-  const {
-    data: insertedData,
-    error: insertError,
-  } =
+  /* Insert database record */
+
+  const insertResult =
     await client
       .from('wallpapers')
-      .insert([dbPayload])
+      .insert([
+        dbPayload,
+      ])
       .select()
       .single();
 
-  if (insertError) {
+  if (insertResult.error) {
     console.error(
       'Supabase database insert error:',
-      insertError
+      insertResult.error
     );
 
     throw new Error(
-      `Image uploaded, but database insert failed: ${insertError.message}`
+      'Image uploaded, but database insert failed: ' +
+        insertResult.error.message
     );
   }
 
   return mapDbRowToWallpaper(
-    insertedData
+    insertResult.data
   );
 }
 
@@ -682,9 +718,14 @@ export async function insertWallpaperToSupabase(
     mapWallpaperToDbPayload({
       ...wpData,
 
-      views: 0,
-      downloads: 0,
-      favorites: 0,
+      views:
+        0,
+
+      downloads:
+        0,
+
+      favorites:
+        0,
 
       uploadDate:
         new Date()
@@ -692,29 +733,29 @@ export async function insertWallpaperToSupabase(
           .split('T')[0],
     });
 
-  const {
-    data,
-    error,
-  } =
+  const result =
     await client
       .from('wallpapers')
-      .insert([dbPayload])
+      .insert([
+        dbPayload,
+      ])
       .select()
       .single();
 
-  if (error) {
+  if (result.error) {
     console.error(
       'Supabase database insert error:',
-      error
+      result.error
     );
 
     throw new Error(
-      `Database insert failed: ${error.message}`
+      'Database insert failed: ' +
+        result.error.message
     );
   }
 
   return mapDbRowToWallpaper(
-    data
+    result.data
   );
 }
 
@@ -734,20 +775,22 @@ export async function deleteWallpaperFromSupabase(
     );
   }
 
-  const {
-    error,
-  } = await client
-    .from('wallpapers')
-    .delete()
-    .eq('id', id);
+  const result =
+    await client
+      .from('wallpapers')
+      .delete()
+      .eq(
+        'id',
+        id
+      );
 
-  if (error) {
+  if (result.error) {
     console.error(
       'Supabase delete error:',
-      error
+      result.error
     );
 
-    throw error;
+    throw result.error;
   }
 }
 
@@ -770,21 +813,28 @@ export async function incrementStatsInSupabase(
     return;
   }
 
-  const {
-    data,
-    error,
-  } = await client
-    .from('wallpapers')
-    .select(field)
-    .eq('id', id)
-    .single();
+  const result =
+    await client
+      .from('wallpapers')
+      .select(field)
+      .eq(
+        'id',
+        id
+      )
+      .single();
 
-  if (error || !data) {
+  if (
+    result.error ||
+    !result.data
+  ) {
     return;
   }
 
   const currentValue =
-    Number(data[field] || 0);
+    Number(
+      result.data[field] ||
+        0
+    );
 
   await client
     .from('wallpapers')
@@ -793,11 +843,14 @@ export async function incrementStatsInSupabase(
         currentValue +
         incrementBy,
     })
-    .eq('id', id);
+    .eq(
+      'id',
+      id
+    );
 }
 
 /* ============================================================
-   SEED INITIAL WALLPAPERS
+   SEED DATABASE
 ============================================================ */
 
 export async function seedInitialWallpapersToSupabase(
@@ -812,33 +865,36 @@ export async function seedInitialWallpapersToSupabase(
     );
   }
 
-  const dbPayloads =
+  const payloads =
     initialWallpapers.map(
-      (wp) =>
+      (
+        wallpaper
+      ) =>
         mapWallpaperToDbPayload(
-          wp
+          wallpaper
         )
     );
 
-  const {
-    data,
-    error,
-  } =
+  const result =
     await client
       .from('wallpapers')
-      .insert(dbPayloads)
+      .insert(
+        payloads
+      )
       .select();
 
-  if (error) {
+  if (result.error) {
     console.error(
       'Supabase seed error:',
-      error
+      result.error
     );
 
-    throw error;
+    throw result.error;
   }
 
-  return (data || []).map(
+  return (
+    result.data || []
+  ).map(
     mapDbRowToWallpaper
   );
 }
@@ -847,114 +903,83 @@ export async function seedInitialWallpapersToSupabase(
    SUPABASE SQL SCHEMA
 ============================================================ */
 
-export const SUPABASE_SQL_SCHEMA = `
-create extension if not exists pgcrypto;
-
-create table if not exists public.wallpapers (
-  id uuid default gen_random_uuid() primary key,
-
-  title text not null,
-
-  description text,
-
-  image_url text,
-
-  url text,
-
-  thumbnail_url text,
-
-  category text not null default 'Cyberpunk',
-
-  resolution text default '3840 x 2160',
-
-  resolution_tag text default '4K',
-
-  size text default '5.0 MB',
-
-  orientation text default 'landscape',
-
-  color_hex jsonb
-    default '["#0B1220", "#38BDF8", "#818CF8"]'::jsonb,
-
-  color_name text default 'Blue',
-
-  upload_date date default current_date,
-
-  views integer default 0,
-
-  downloads integer default 0,
-
-  favorites integer default 0,
-
-  tags jsonb default '[]'::jsonb,
-
-  author jsonb
-    default '{"name":"Station Creator"}'::jsonb,
-
-  author_name text default 'Station Creator',
-
-  author_avatar text default '',
-
-  is_featured boolean default false,
-
-  is_wallpaper_of_the_day boolean default false,
-
-  is_ai_generated boolean default false,
-
-  aspect_ratio text default '16:9',
-
-  created_at timestamptz default now()
-);
-
-alter table public.wallpapers
-enable row level security;
-
-drop policy if exists "Public Access Read"
-on public.wallpapers;
-
-drop policy if exists "Authenticated Admin Insert"
-on public.wallpapers;
-
-drop policy if exists "Authenticated Admin Update"
-on public.wallpapers;
-
-drop policy if exists "Authenticated Admin Delete"
-on public.wallpapers;
-
-create policy "Public Access Read"
-on public.wallpapers
-for select
-using (true);
-
-create policy "Authenticated Admin Insert"
-on public.wallpapers
-for insert
-to authenticated
-with check (
-  auth.uid() =
-  '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
-);
-
-create policy "Authenticated Admin Update"
-on public.wallpapers
-for update
-to authenticated
-using (
-  auth.uid() =
-  '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
-)
-with check (
-  auth.uid() =
-  '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
-);
-
-create policy "Authenticated Admin Delete"
-on public.wallpapers
-for delete
-to authenticated
-using (
-  auth.uid() =
-  '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
-);
-`;
+export const SUPABASE_SQL_SCHEMA = [
+  'create extension if not exists pgcrypto;',
+  '',
+  'create table if not exists public.wallpapers (',
+  '  id uuid default gen_random_uuid() primary key,',
+  '  title text not null,',
+  '  description text,',
+  '  image_url text,',
+  '  url text,',
+  '  thumbnail_url text,',
+  "  category text not null default 'Cyberpunk',",
+  "  resolution text default '3840 x 2160',",
+  "  resolution_tag text default '4K',",
+  "  size text default '5.0 MB',",
+  "  orientation text default 'landscape',",
+  '  color_hex jsonb default \'["#0B1220", "#38BDF8", "#818CF8"]\'::jsonb,',
+  "  color_name text default 'Blue',",
+  '  upload_date date default current_date,',
+  '  views integer default 0,',
+  '  downloads integer default 0,',
+  '  favorites integer default 0,',
+  "  tags jsonb default '[]'::jsonb,",
+  "  author jsonb default '{\"name\":\"Station Creator\"}'::jsonb,",
+  "  author_name text default 'Station Creator',",
+  "  author_avatar text default '',",
+  '  is_featured boolean default false,',
+  '  is_wallpaper_of_the_day boolean default false,',
+  '  is_ai_generated boolean default false,',
+  "  aspect_ratio text default '16:9',",
+  '  created_at timestamptz default now()',
+  ');',
+  '',
+  'alter table public.wallpapers',
+  'enable row level security;',
+  '',
+  'drop policy if exists "Public Access Read"',
+  'on public.wallpapers;',
+  '',
+  'drop policy if exists "Authenticated Admin Insert"',
+  'on public.wallpapers;',
+  '',
+  'drop policy if exists "Authenticated Admin Update"',
+  'on public.wallpapers;',
+  '',
+  'drop policy if exists "Authenticated Admin Delete"',
+  'on public.wallpapers;',
+  '',
+  'create policy "Public Access Read"',
+  'on public.wallpapers',
+  'for select',
+  'using (true);',
+  '',
+  'create policy "Authenticated Admin Insert"',
+  'on public.wallpapers',
+  'for insert',
+  'to authenticated',
+  'with check (',
+  "  auth.uid() = '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid",
+  ');',
+  '',
+  'create policy "Authenticated Admin Update"',
+  'on public.wallpapers',
+  'for update',
+  'to authenticated',
+  'using (',
+  "  auth.uid() = '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid",
+  ')',
+  'with check (',
+  "  auth.uid() = '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid",
+  ');',
+  '',
+  'create policy "Authenticated Admin Delete"',
+  'on public.wallpapers',
+  'for delete',
+  'to authenticated',
+  'using (',
+  "  auth.uid() = '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid",
+  ');',
+].join('\n');
 ```
