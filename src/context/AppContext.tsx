@@ -6,6 +6,7 @@ import React, {
   useEffect,
   useCallback,
 } from 'react';
+
 import {
   Session,
   User,
@@ -633,10 +634,11 @@ export const AppProvider: React.FC<{
       authUser?.email || '',
 
     avatar:
-  authUser?.user_metadata?.avatar_url ||
-  `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
-    authUser?.email || 'guest'
-  )}`,
+      authUser?.user_metadata
+        ?.avatar_url ||
+      `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
+        authUser?.email || 'guest'
+      )}`,
 
     isLoggedIn:
       Boolean(authUser),
