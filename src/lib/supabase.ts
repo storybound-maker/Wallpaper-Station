@@ -96,10 +96,6 @@ export const resetSupabaseClientInstance = (): void => {
   clientInstance = null;
 };
 
-/*
- * Do not create the client until it is actually needed.
- * This prevents configuration problems during Vercel builds.
- */
 export const getSupabase = (): SupabaseClient | null => {
   return getSupabaseClient();
 };
@@ -566,12 +562,6 @@ export async function uploadWallpaperFileAndSave({
         8
       );
 
-  /*
-   * Use string concatenation instead of
-   * template literals to avoid the syntax
-   * problem that previously appeared in Vercel.
-   */
-
   const fileName =
     String(Date.now()) +
     '-' +
@@ -584,8 +574,6 @@ export async function uploadWallpaperFileAndSave({
   const filePath =
     'wallpapers/' +
     fileName;
-
-  /* Upload */
 
   const uploadResult =
     await client.storage
@@ -614,8 +602,6 @@ export async function uploadWallpaperFileAndSave({
     );
   }
 
-  /* Public URL */
-
   const publicResult =
     client.storage
       .from(bucketName)
@@ -632,8 +618,6 @@ export async function uploadWallpaperFileAndSave({
       'Image uploaded but Supabase did not return a public URL.'
     );
   }
-
-  /* Database payload */
 
   const dbPayload =
     mapWallpaperToDbPayload({
@@ -655,8 +639,6 @@ export async function uploadWallpaperFileAndSave({
           .toISOString()
           .split('T')[0],
     });
-
-  /* Insert database record */
 
   const insertResult =
     await client
@@ -981,3 +963,4 @@ export const SUPABASE_SQL_SCHEMA = [
   ');',
 ].join('\n');
 ```
+
