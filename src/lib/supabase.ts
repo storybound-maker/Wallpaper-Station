@@ -44,9 +44,9 @@ export const isSupabaseConfigured = (): boolean => {
 
   return Boolean(
     url &&
-    key &&
-    url.startsWith('https://') &&
-    key.length > 20
+      key &&
+      url.startsWith('https://') &&
+      key.length > 20
   );
 };
 
@@ -215,22 +215,22 @@ export function mapDbRowToWallpaper(row: any): Wallpaper {
     isFeatured:
       Boolean(
         row.is_featured ??
-        row.isFeatured ??
-        false
+          row.isFeatured ??
+          false
       ),
 
     isWallpaperOfTheDay:
       Boolean(
         row.is_wallpaper_of_the_day ??
-        row.isWallpaperOfTheDay ??
-        false
+          row.isWallpaperOfTheDay ??
+          false
       ),
 
     isAIGenerated:
       Boolean(
         row.is_ai_generated ??
-        row.isAIGenerated ??
-        false
+          row.isAIGenerated ??
+          false
       ),
 
     aspectRatio:
@@ -326,4 +326,558 @@ export function mapWallpaperToDbPayload(
       wp.author || {
         name: 'Station Creator',
         avatar:
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=
+          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+      },
+
+    author_name:
+      wp.author?.name ||
+      'Station Creator',
+
+    author_avatar:
+      wp.author?.avatar ||
+      null,
+
+    is_featured:
+      wp.isFeatured ?? false,
+
+    is_wallpaper_of_the_day:
+      wp.isWallpaperOfTheDay ?? false,
+
+    is_ai_generated:
+      wp.isAIGenerated ?? false,
+
+    aspect_ratio:
+      wp.aspectRatio ||
+      '16:9',
+  };
+}
+
+/**
+ * ============================================================
+ * FETCH WALLPAPERS
+ * ============================================================
+ */
+
+export async function fetchWallpapersFromSupabase(): Promise<Wallpaper[]> {
+  const client = getSupabaseClient();
+
+  if (!client) {
+    throw new Error(
+      'Supabase is not configured. Check your Supabase URL and key.'
+    );
+  }
+
+  const {
+    data,
+    error,
+  } = await client
+    .from('wallpapers')
+    .select('*')
+    .order('created_at', {
+      ascending: false,
+    });
+
+  if (error) {
+    console.error(
+      'Supabase fetch error:',
+      error
+    );
+
+    throw error;
+  }
+
+  return (data || []).map(
+    mapDbRowToWallpaper
+  );
+}
+
+/**
+ * ============================================================
+ * UPLOAD FILE TO STORAGE + DATABASE
+ * ============================================================
+ */
+
+export async function uploadWallpaperFileAndSave({
+  file,
+  metadata,
+}: {
+  file: File;
+
+  metadata: Omit<
+    Wallpaper,
+    | 'id'
+    | 'views'
+    | 'downloads'
+    | 'favorites'
+    | 'uploadDate'
+    | 'url'
+    | 'thumbnailUrl'
+  >;
+}): Promise<Wallpaper> {
+  const client =
+    getSupabaseClient();
+
+  if (!client) {
+    throw new Error(
+      'Supabase is not configured.'
+    );
+  }
+
+  const BUCKET_NAME =
+    'wallpapers';
+
+  const fileExt =
+    file.name
+      .split('.')
+      .pop()
+      ?.toLowerCase() ||
+    'jpg';
+
+  const safeBaseName =
+    file.name
+      .replace(
+        /\.[^/.]+$/,
+        ''
+      )
+      .replace(
+        /[^a-zA-Z0-9-_]/g,
+        '-'
+      )
+      .toLowerCase();
+
+  const fileName =
+    `${Date.now()}-${Math.random()
+      .toString(36)
+      .substring(2, 8)}-${safeBaseName}.${fileExt}`;
+
+  const filePath =
+    `wallpapers/${fileName}`;
+
+  /**
+   * ==========================================================
+   * 1. UPLOAD IMAGE
+   * ==========================================================
+   */
+
+  const {
+    error: uploadError,
+  } = await client.storage
+    .from(BUCKET_NAME)
+    .upload(
+      filePath,
+      file,
+      {
+        cacheControl:
+          '3600',
+        upsert:
+          false,
+        contentType:
+          file.type ||
+          'image/jpeg',
+      }
+    );
+
+  if (uploadError) {
+    console.error(
+      'Supabase Storage upload error:',
+      uploadError
+    );
+
+    throw new Error(
+      `Storage upload failed: ${uploadError.message}`
+    );
+  }
+
+  /**
+   * ==========================================================
+   * 2. GET PUBLIC URL
+   * ==========================================================
+   */
+
+  const {
+    data: publicUrlData,
+  } =
+    client.storage
+      .from(BUCKET_NAME)
+      .getPublicUrl(
+        filePath
+      );
+
+  const publicUrl =
+    publicUrlData?.publicUrl ||
+    '';
+
+  if (!publicUrl) {
+    throw new Error(
+      'Image uploaded but Supabase did not return a public URL.'
+    );
+  }
+
+  /**
+   * ==========================================================
+   * 3. SAVE METADATA
+   * ==========================================================
+   */
+
+  const dbPayload =
+    mapWallpaperToDbPayload({
+      ...metadata,
+
+      url:
+        publicUrl,
+
+      thumbnailUrl:
+        publicUrl,
+
+      views:
+        0,
+
+      downloads:
+        0,
+
+      favorites:
+        0,
+
+      uploadDate:
+        new Date()
+          .toISOString()
+          .split('T')[0],
+    });
+
+  const {
+    data: insertedData,
+    error: insertError,
+  } =
+    await client
+      .from('wallpapers')
+      .insert([
+        dbPayload,
+      ])
+      .select()
+      .single();
+
+  if (insertError) {
+    console.error(
+      'Supabase database insert error:',
+      insertError
+    );
+
+    throw new Error(
+      `Image uploaded, but database insert failed: ${insertError.message}`
+    );
+  }
+
+  return mapDbRowToWallpaper(
+    insertedData
+  );
+}
+
+/**
+ * ============================================================
+ * INSERT WALLPAPER USING EXISTING URL
+ * ============================================================
+ */
+
+export async function insertWallpaperToSupabase(
+  wpData: Omit<
+    Wallpaper,
+    | 'id'
+    | 'views'
+    | 'downloads'
+    | 'favorites'
+    | 'uploadDate'
+  >
+): Promise<Wallpaper> {
+  const client =
+    getSupabaseClient();
+
+  if (!client) {
+    throw new Error(
+      'Supabase is not configured.'
+    );
+  }
+
+  const dbPayload =
+    mapWallpaperToDbPayload({
+      ...wpData,
+
+      views:
+        0,
+
+      downloads:
+        0,
+
+      favorites:
+        0,
+
+      uploadDate:
+        new Date()
+          .toISOString()
+          .split('T')[0],
+    });
+
+  const {
+    data,
+    error,
+  } =
+    await client
+      .from('wallpapers')
+      .insert([
+        dbPayload,
+      ])
+      .select()
+      .single();
+
+  if (error) {
+    console.error(
+      'Supabase database insert error:',
+      error
+    );
+
+    throw new Error(
+      `Database insert failed: ${error.message}`
+    );
+  }
+
+  return mapDbRowToWallpaper(
+    data
+  );
+}
+
+/**
+ * ============================================================
+ * DELETE WALLPAPER
+ * ============================================================
+ */
+
+export async function deleteWallpaperFromSupabase(
+  id: string
+): Promise<void> {
+  const client =
+    getSupabaseClient();
+
+  if (!client) {
+    throw new Error(
+      'Supabase is not configured.'
+    );
+  }
+
+  const {
+    error,
+  } =
+    await client
+      .from('wallpapers')
+      .delete()
+      .eq('id', id);
+
+  if (error) {
+    console.error(
+      'Supabase delete error:',
+      error
+    );
+
+    throw error;
+  }
+}
+
+/**
+ * ============================================================
+ * UPDATE WALLPAPER STATS
+ * ============================================================
+ */
+
+export async function incrementStatsInSupabase(
+  id: string,
+  field:
+    | 'downloads'
+    | 'views'
+    | 'favorites',
+  incrementBy = 1
+): Promise<void> {
+  const client =
+    getSupabaseClient();
+
+  if (!client) {
+    return;
+  }
+
+  const {
+    data,
+    error,
+  } =
+    await client
+      .from('wallpapers')
+      .select(field)
+      .eq('id', id)
+      .single();
+
+  if (error || !data) {
+    return;
+  }
+
+  const currentValue =
+    Number(
+      data[field] || 0
+    );
+
+  await client
+    .from('wallpapers')
+    .update({
+      [field]:
+        currentValue +
+        incrementBy,
+    })
+    .eq('id', id);
+}
+
+/**
+ * ============================================================
+ * SEED INITIAL WALLPAPERS
+ * ============================================================
+ */
+
+export async function seedInitialWallpapersToSupabase(
+  initialWallpapers: Wallpaper[]
+): Promise<Wallpaper[]> {
+  const client =
+    getSupabaseClient();
+
+  if (!client) {
+    throw new Error(
+      'Supabase is not configured.'
+    );
+  }
+
+  const dbPayloads =
+    initialWallpapers.map(
+      (wp) =>
+        mapWallpaperToDbPayload(
+          wp
+        )
+    );
+
+  const {
+    data,
+    error,
+  } =
+    await client
+      .from('wallpapers')
+      .insert(
+        dbPayloads
+      )
+      .select();
+
+  if (error) {
+    console.error(
+      'Supabase seed error:',
+      error
+    );
+
+    throw error;
+  }
+
+  return (data || []).map(
+    mapDbRowToWallpaper
+  );
+}
+
+/**
+ * ============================================================
+ * SQL SCHEMA
+ *
+ * IMPORTANT:
+ * This is only exported because AdminDashboard imports it.
+ * It does NOT automatically execute the SQL.
+ * ============================================================
+ */
+
+export const SUPABASE_SQL_SCHEMA = `
+-- ============================================================
+-- WALLPAPER STATION DATABASE
+-- ============================================================
+
+create extension if not exists pgcrypto;
+
+-- ============================================================
+-- WALLPAPERS TABLE
+-- ============================================================
+
+create table if not exists public.wallpapers (
+  id uuid default gen_random_uuid() primary key,
+
+  title text not null,
+
+  description text,
+
+  image_url text,
+
+  url text,
+
+  thumbnail_url text,
+
+  category text not null default 'Cyberpunk',
+
+  resolution text default '3840 x 2160',
+
+  resolution_tag text default '4K',
+
+  size text default '5.0 MB',
+
+  orientation text default 'landscape',
+
+  color_hex jsonb
+    default '["#0B1220", "#38BDF8", "#818CF8"]'::jsonb,
+
+  color_name text default 'Blue',
+
+  upload_date date default current_date,
+
+  views integer default 0,
+
+  downloads integer default 0,
+
+  favorites integer default 0,
+
+  tags jsonb default '[]'::jsonb,
+
+  author jsonb
+    default '{"name":"Station Creator"}'::jsonb,
+
+  author_name text default 'Station Creator',
+
+  author_avatar text default '',
+
+  is_featured boolean default false,
+
+  is_wallpaper_of_the_day boolean default false,
+
+  is_ai_generated boolean default false,
+
+  aspect_ratio text default '16:9',
+
+  created_at timestamptz default now()
+);
+
+-- ============================================================
+-- ENABLE ROW LEVEL SECURITY
+-- ============================================================
+
+alter table public.wallpapers
+enable row level security;
+
+-- ============================================================
+-- PUBLIC READ POLICY
+-- ============================================================
+
+drop policy if exists "Public Access Read"
+on public.wallpapers;
+
+create policy "Public Access Read"
+on public.wallpapers
+for select
+using (true);
+
+-- ============================================================
+-- END OF SCHEMA
+-- ============================================================
+`;
