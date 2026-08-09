@@ -1,5 +1,6 @@
 ```tsx
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
 import {
   Wallpaper,
   ResolutionOption,
@@ -10,6 +11,9 @@ import {
 /* ============================================================
    SUPABASE CONFIGURATION
 ============================================================ */
+
+export const ADMIN_SUPABASE_UID =
+  '188791bc-6d87-4d28-8716-0f1efcad00e1';
 
 export const getSupabaseConfig = () => {
   const customUrl =
@@ -50,20 +54,6 @@ export const isSupabaseConfigured = (): boolean => {
 };
 
 /* ============================================================
-   ADMIN CONFIGURATION
-============================================================ */
-
-/*
- * This is the Supabase Auth UID of the Wallpaper Station
- * administrator.
- *
- * IMPORTANT:
- * This is a user UUID, not a Supabase service-role key.
- */
-export const ADMIN_SUPABASE_UID =
-  '188791bc-6d87-4d28-8716-0f1efcad00e1';
-
-/* ============================================================
    SUPABASE CLIENT
 ============================================================ */
 
@@ -97,6 +87,106 @@ export const resetSupabaseClientInstance = () => {
 
 export const supabase: SupabaseClient | null =
   getSupabaseClient();
+
+/* ============================================================
+   AUTH
+============================================================ */
+
+export const signInWithEmail = async (
+  email: string,
+  password: string
+) => {
+  const client = getSupabaseClient();
+
+  if (!client) {
+    return {
+      data: null,
+      error: new Error('Supabase is not configured.'),
+    };
+  }
+
+  const { data, error } =
+    await client.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+  return {
+    data,
+    error,
+  };
+};
+
+export const signUpWithEmail = async (
+  email: string,
+  password: string,
+  name?: string
+) => {
+  const client = getSupabaseClient();
+
+  if (!client) {
+    return {
+      data: {
+        user: null,
+        session: null,
+      },
+      error: new Error('Supabase is not configured.'),
+    };
+  }
+
+  const { data, error } =
+    await client.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name || '',
+          name: name || '',
+        },
+      },
+    });
+
+  return {
+    data,
+    error,
+  };
+};
+
+export const signOutUser = async () => {
+  const client = getSupabaseClient();
+
+  if (!client) {
+    throw new Error('Supabase is not configured.');
+  }
+
+  const { error } =
+    await client.auth.signOut();
+
+  if (error) {
+    throw error;
+  }
+};
+
+export const sendPasswordResetEmail = async (
+  email: string
+) => {
+  const client = getSupabaseClient();
+
+  if (!client) {
+    return {
+      error: new Error('Supabase is not configured.'),
+    };
+  }
+
+  const { error } =
+    await client.auth.resetPasswordForEmail(
+      email
+    );
+
+  return {
+    error,
+  };
+};
 
 /* ============================================================
    DATABASE ROW -> WALLPAPER
@@ -187,7 +277,9 @@ export function mapDbRowToWallpaper(
         : typeof row.tags === 'string'
           ? row.tags
               .split(',')
-              .map((tag: string) => tag.trim())
+              .map((tag: string) =>
+                tag.trim()
+              )
               .filter(Boolean)
           : [],
 
@@ -346,10 +438,12 @@ export function mapWallpaperToDbPayload(
       wp.isFeatured ?? false,
 
     is_wallpaper_of_the_day:
-      wp.isWallpaperOfTheDay ?? false,
+      wp.isWallpaperOfTheDay ??
+      false,
 
     is_ai_generated:
-      wp.isAIGenerated ?? false,
+      wp.isAIGenerated ??
+      false,
 
     aspect_ratio:
       wp.aspectRatio ||
@@ -445,13 +539,23 @@ export async function uploadWallpaperFileAndSave({
       )
       .toLowerCase();
 
-  const fileName =
-    `${Date.now()}-${Math.random()
+  const randomId =
+    Math.random()
       .toString(36)
-      .substring(2, 8)}-${safeBaseName}.${fileExt}`;
+      .substring(2, 8);
+
+  const fileName =
+    Date.now() +
+    '-' +
+    randomId +
+    '-' +
+    safeBaseName +
+    '.' +
+    fileExt;
 
   const filePath =
-    `wallpapers/${fileName}`;
+    'wallpapers/' +
+    fileName;
 
   /* Upload image */
 
@@ -528,11 +632,12 @@ export async function uploadWallpaperFileAndSave({
   const {
     data: insertedData,
     error: insertError,
-  } = await client
-    .from('wallpapers')
-    .insert([dbPayload])
-    .select()
-    .single();
+  } =
+    await client
+      .from('wallpapers')
+      .insert([dbPayload])
+      .select()
+      .single();
 
   if (insertError) {
     console.error(
@@ -590,11 +695,12 @@ export async function insertWallpaperToSupabase(
   const {
     data,
     error,
-  } = await client
-    .from('wallpapers')
-    .insert([dbPayload])
-    .select()
-    .single();
+  } =
+    await client
+      .from('wallpapers')
+      .insert([dbPayload])
+      .select()
+      .single();
 
   if (error) {
     console.error(
@@ -717,10 +823,11 @@ export async function seedInitialWallpapersToSupabase(
   const {
     data,
     error,
-  } = await client
-    .from('wallpapers')
-    .insert(dbPayloads)
-    .select();
+  } =
+    await client
+      .from('wallpapers')
+      .insert(dbPayloads)
+      .select();
 
   if (error) {
     console.error(
@@ -805,13 +912,13 @@ enable row level security;
 drop policy if exists "Public Access Read"
 on public.wallpapers;
 
-drop policy if exists "Public Access Insert"
+drop policy if exists "Authenticated Admin Insert"
 on public.wallpapers;
 
-drop policy if exists "Public Access Update"
+drop policy if exists "Authenticated Admin Update"
 on public.wallpapers;
 
-drop policy if exists "Public Access Delete"
+drop policy if exists "Authenticated Admin Delete"
 on public.wallpapers;
 
 create policy "Public Access Read"
@@ -825,7 +932,7 @@ for insert
 to authenticated
 with check (
   auth.uid() =
-    '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
+  '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
 );
 
 create policy "Authenticated Admin Update"
@@ -834,11 +941,11 @@ for update
 to authenticated
 using (
   auth.uid() =
-    '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
+  '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
 )
 with check (
   auth.uid() =
-    '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
+  '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
 );
 
 create policy "Authenticated Admin Delete"
@@ -847,7 +954,7 @@ for delete
 to authenticated
 using (
   auth.uid() =
-    '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
+  '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
 );
 `;
 ```
