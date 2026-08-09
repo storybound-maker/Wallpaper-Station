@@ -6,35 +6,20 @@ import {
   OrientationType,
 } from '../types';
 
-/**
- * ============================================================
- * WALLPAPER STATION - SUPABASE CONFIGURATION
- * ============================================================
- */
+/* ============================================================
+   ADMIN
+   ============================================================ */
 
 export const ADMIN_UID =
   '188791bc-6d87-4d28-8716-0f1efcad00e1';
 
+/* ============================================================
+   SUPABASE CONFIGURATION
+   ============================================================ */
+
 export const getSupabaseConfig = () => {
-  const customUrl =
-    typeof window !== 'undefined'
-      ? localStorage.getItem('ws_supabase_url')
-      : null;
-
-  const customKey =
-    typeof window !== 'undefined'
-      ? localStorage.getItem('ws_supabase_key')
-      : null;
-
-  const url =
-    customUrl ||
-    import.meta.env.VITE_SUPABASE_URL ||
-    '';
-
-  const key =
-    customKey ||
-    import.meta.env.VITE_SUPABASE_ANON_KEY ||
-    '';
+  const url = import.meta.env.VITE_SUPABASE_URL || '';
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
   return {
     url: url.trim(),
@@ -53,37 +38,23 @@ export const isSupabaseConfigured = (): boolean => {
   );
 };
 
-/**
- * ============================================================
- * SUPABASE CLIENT
- * ============================================================
- */
+/* ============================================================
+   SUPABASE CLIENT
+   ============================================================ */
 
 let clientInstance: SupabaseClient | null = null;
 
-export const getSupabaseClient = (): SupabaseClient | null => {
+export const getSupabaseClient = (): SupabaseClient => {
   const { url, key } = getSupabaseConfig();
 
   if (!url || !key) {
-    return null;
-  }
-
-  if (!url.startsWith('https://')) {
-    return null;
-  }
-
-  if (key.length <= 20) {
-    return null;
+    throw new Error(
+      'Supabase is not configured. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'
+    );
   }
 
   if (!clientInstance) {
-    clientInstance = createClient(url, key, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-    });
+    clientInstance = createClient(url, key);
   }
 
   return clientInstance;
@@ -93,20 +64,12 @@ export const resetSupabaseClientInstance = () => {
   clientInstance = null;
 };
 
-export const supabase = getSupabaseClient();
+/* ============================================================
+   AUTH HELPERS
+   ============================================================ */
 
-/**
- * ============================================================
- * ADMIN AUTHENTICATION
- * ============================================================
- */
-
-export async function getCurrentSupabaseUser() {
+export async function getCurrentUser() {
   const client = getSupabaseClient();
-
-  if (!client) {
-    return null;
-  }
 
   const {
     data: { user },
@@ -114,29 +77,74 @@ export async function getCurrentSupabaseUser() {
   } = await client.auth.getUser();
 
   if (error) {
-    console.warn('Could not get Supabase user:', error.message);
-    return null;
+    throw error;
   }
 
   return user;
 }
 
-export async function isCurrentUserAdmin(): Promise<boolean> {
-  const user = await getCurrentSupabaseUser();
+export async function signInAdmin(
+  email: string,
+  password: string
+) {
+  const client = getSupabaseClient();
 
-  return Boolean(
-    user &&
-      user.id === ADMIN_UID
-  );
+  const {
+    data,
+    error,
+  } = await client.auth.signInWithPassword({
+    email: email.trim(),
+    password,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data.user) {
+    throw new Error('Login succeeded but no user was returned.');
+  }
+
+  if (data.user.id !== ADMIN_UID) {
+    await client.auth.signOut();
+
+    throw new Error(
+      'This account does not have administrator permission.'
+    );
+  }
+
+  return data.user;
 }
 
-/**
- * ============================================================
- * DATABASE ROW -> WALLPAPER
- * ============================================================
- */
+export async function signOutUser() {
+  const client = getSupabaseClient();
 
-export function mapDbRowToWallpaper(row: any): Wallpaper {
+  const { error } = await client.auth.signOut();
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function isCurrentUserAdmin(): Promise<boolean> {
+  try {
+    const user = await getCurrentUser();
+
+    return Boolean(
+      user && user.id === ADMIN_UID
+    );
+  } catch {
+    return false;
+  }
+}
+
+/* ============================================================
+   DATABASE ROW -> WALLPAPER
+   ============================================================ */
+
+export function mapDbRowToWallpaper(
+  row: any
+): Wallpaper {
   return {
     id: String(row.id),
 
@@ -219,9 +227,7 @@ export function mapDbRowToWallpaper(row: any): Wallpaper {
         : typeof row.tags === 'string'
         ? row.tags
             .split(',')
-            .map((tag: string) =>
-              tag.trim()
-            )
+            .map((tag: string) => tag.trim())
             .filter(Boolean)
         : [],
 
@@ -283,11 +289,9 @@ export function mapDbRowToWallpaper(row: any): Wallpaper {
   };
 }
 
-/**
- * ============================================================
- * WALLPAPER -> DATABASE PAYLOAD
- * ============================================================
- */
+/* ============================================================
+   WALLPAPER -> DATABASE PAYLOAD
+   ============================================================ */
 
 export function mapWallpaperToDbPayload(
   wp: Partial<Wallpaper>
@@ -366,8 +370,6 @@ export function mapWallpaperToDbPayload(
     author:
       wp.author || {
         name: 'Station Creator',
-        avatar:
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
       },
 
     author_name:
@@ -393,23 +395,14 @@ export function mapWallpaperToDbPayload(
   };
 }
 
-/**
- * ============================================================
- * FETCH WALLPAPERS
- * ============================================================
- */
+/* ============================================================
+   FETCH WALLPAPERS
+   ============================================================ */
 
 export async function fetchWallpapersFromSupabase(): Promise<
   Wallpaper[]
 > {
-  const client =
-    getSupabaseClient();
-
-  if (!client) {
-    throw new Error(
-      'Supabase is not configured. Check your Supabase URL and key.'
-    );
-  }
+  const client = getSupabaseClient();
 
   const {
     data,
@@ -435,12 +428,31 @@ export async function fetchWallpapersFromSupabase(): Promise<
   );
 }
 
-/**
- * ============================================================
- * UPLOAD FILE TO STORAGE + DATABASE
- * ADMIN ONLY
- * ============================================================
- */
+/* ============================================================
+   ADMIN CHECK
+   ============================================================ */
+
+async function requireAdmin() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    throw new Error(
+      'You must be signed in as administrator.'
+    );
+  }
+
+  if (user.id !== ADMIN_UID) {
+    throw new Error(
+      'You do not have administrator permission.'
+    );
+  }
+
+  return user;
+}
+
+/* ============================================================
+   UPLOAD IMAGE FILE + DATABASE RECORD
+   ============================================================ */
 
 export async function uploadWallpaperFileAndSave({
   file,
@@ -459,40 +471,13 @@ export async function uploadWallpaperFileAndSave({
     | 'thumbnailUrl'
   >;
 }): Promise<Wallpaper> {
-  const client =
-    getSupabaseClient();
+  const client = getSupabaseClient();
 
-  if (!client) {
-    throw new Error(
-      'Supabase is not configured.'
-    );
-  }
-
-  /**
-   * Verify the actual Supabase session.
-   *
-   * This is NOT based on localStorage or
-   * the React user object.
-   */
-  const admin =
-    await isCurrentUserAdmin();
-
-  if (!admin) {
-    throw new Error(
-      'Unauthorized: only the Wallpaper Station administrator can upload wallpapers.'
-    );
-  }
-
-  const BUCKET_NAME =
-    'wallpapers';
-
-  /**
-   * Validate file.
-   */
+  await requireAdmin();
 
   if (!file) {
     throw new Error(
-      'No image file was selected.'
+      'Please select an image file.'
     );
   }
 
@@ -502,9 +487,17 @@ export async function uploadWallpaperFileAndSave({
     );
   }
 
-  /**
-   * Create safe unique filename.
-   */
+  const maxSize =
+    25 * 1024 * 1024;
+
+  if (file.size > maxSize) {
+    throw new Error(
+      'Image must be smaller than 25 MB.'
+    );
+  }
+
+  const BUCKET_NAME =
+    'wallpapers';
 
   const fileExt =
     file.name
@@ -515,10 +508,7 @@ export async function uploadWallpaperFileAndSave({
 
   const safeBaseName =
     file.name
-      .replace(
-        /\.[^/.]+$/,
-        ''
-      )
+      .replace(/\.[^/.]+$/, '')
       .replace(
         /[^a-zA-Z0-9-_]/g,
         '-'
@@ -533,11 +523,9 @@ export async function uploadWallpaperFileAndSave({
   const filePath =
     `wallpapers/${fileName}`;
 
-  /**
-   * ==========================================================
-   * 1. UPLOAD IMAGE TO STORAGE
-   * ==========================================================
-   */
+  /* -------------------------------
+     1. Upload image
+     ------------------------------- */
 
   const {
     error: uploadError,
@@ -556,66 +544,42 @@ export async function uploadWallpaperFileAndSave({
     );
 
   if (uploadError) {
-    console.error(
-      'Supabase Storage upload error:',
-      uploadError
-    );
-
     throw new Error(
       `Storage upload failed: ${uploadError.message}`
     );
   }
 
-  /**
-   * ==========================================================
-   * 2. GET PUBLIC URL
-   * ==========================================================
-   */
+  /* -------------------------------
+     2. Public URL
+     ------------------------------- */
 
   const {
     data: publicUrlData,
-  } =
-    client.storage
-      .from(BUCKET_NAME)
-      .getPublicUrl(
-        filePath
-      );
+  } = client.storage
+    .from(BUCKET_NAME)
+    .getPublicUrl(filePath);
 
   const publicUrl =
-    publicUrlData?.publicUrl ||
-    '';
+    publicUrlData?.publicUrl || '';
 
   if (!publicUrl) {
     throw new Error(
-      'Image uploaded but Supabase did not return a public URL.'
+      'The image uploaded but no public URL was returned.'
     );
   }
 
-  /**
-   * ==========================================================
-   * 3. SAVE METADATA TO DATABASE
-   * ==========================================================
-   */
+  /* -------------------------------
+     3. Database record
+     ------------------------------- */
 
   const dbPayload =
     mapWallpaperToDbPayload({
       ...metadata,
-
-      url:
-        publicUrl,
-
-      thumbnailUrl:
-        publicUrl,
-
-      views:
-        0,
-
-      downloads:
-        0,
-
-      favorites:
-        0,
-
+      url: publicUrl,
+      thumbnailUrl: publicUrl,
+      views: 0,
+      downloads: 0,
+      favorites: 0,
       uploadDate:
         new Date()
           .toISOString()
@@ -625,36 +589,24 @@ export async function uploadWallpaperFileAndSave({
   const {
     data: insertedData,
     error: insertError,
-  } =
-    await client
-      .from('wallpapers')
-      .insert([
-        dbPayload,
-      ])
-      .select()
-      .single();
+  } = await client
+    .from('wallpapers')
+    .insert([dbPayload])
+    .select()
+    .single();
 
   if (insertError) {
-    console.error(
-      'Supabase database insert error:',
-      insertError
-    );
-
-    /**
-     * If database insertion fails after
-     * storage upload, attempt to remove
-     * the orphaned image.
-     */
+    /*
+      If database insertion fails, remove the uploaded
+      image so we don't leave orphaned files in Storage.
+    */
 
     await client.storage
       .from(BUCKET_NAME)
-      .remove([
-        filePath,
-      ])
-      .catch(() => {});
+      .remove([filePath]);
 
     throw new Error(
-      `Image uploaded, but database insert failed: ${insertError.message}`
+      `Image uploaded but database insert failed: ${insertError.message}`
     );
   }
 
@@ -663,12 +615,9 @@ export async function uploadWallpaperFileAndSave({
   );
 }
 
-/**
- * ============================================================
- * INSERT WALLPAPER USING EXISTING URL
- * ADMIN ONLY
- * ============================================================
- */
+/* ============================================================
+   INSERT WALLPAPER USING URL
+   ============================================================ */
 
 export async function insertWallpaperToSupabase(
   wpData: Omit<
@@ -680,37 +629,16 @@ export async function insertWallpaperToSupabase(
     | 'uploadDate'
   >
 ): Promise<Wallpaper> {
-  const client =
-    getSupabaseClient();
+  const client = getSupabaseClient();
 
-  if (!client) {
-    throw new Error(
-      'Supabase is not configured.'
-    );
-  }
-
-  const admin =
-    await isCurrentUserAdmin();
-
-  if (!admin) {
-    throw new Error(
-      'Unauthorized: only the Wallpaper Station administrator can publish wallpapers.'
-    );
-  }
+  await requireAdmin();
 
   const dbPayload =
     mapWallpaperToDbPayload({
       ...wpData,
-
-      views:
-        0,
-
-      downloads:
-        0,
-
-      favorites:
-        0,
-
+      views: 0,
+      downloads: 0,
+      favorites: 0,
       uploadDate:
         new Date()
           .toISOString()
@@ -720,86 +648,47 @@ export async function insertWallpaperToSupabase(
   const {
     data,
     error,
-  } =
-    await client
-      .from('wallpapers')
-      .insert([
-        dbPayload,
-      ])
-      .select()
-      .single();
+  } = await client
+    .from('wallpapers')
+    .insert([dbPayload])
+    .select()
+    .single();
 
   if (error) {
-    console.error(
-      'Supabase database insert error:',
-      error
-    );
-
     throw new Error(
       `Database insert failed: ${error.message}`
     );
   }
 
-  return mapDbRowToWallpaper(
-    data
-  );
+  return mapDbRowToWallpaper(data);
 }
 
-/**
- * ============================================================
- * DELETE WALLPAPER
- * ADMIN ONLY
- * ============================================================
- */
+/* ============================================================
+   DELETE WALLPAPER
+   ============================================================ */
 
 export async function deleteWallpaperFromSupabase(
   id: string
 ): Promise<void> {
-  const client =
-    getSupabaseClient();
+  const client = getSupabaseClient();
 
-  if (!client) {
-    throw new Error(
-      'Supabase is not configured.'
-    );
-  }
-
-  const admin =
-    await isCurrentUserAdmin();
-
-  if (!admin) {
-    throw new Error(
-      'Unauthorized: only the Wallpaper Station administrator can delete wallpapers.'
-    );
-  }
+  await requireAdmin();
 
   const {
     error,
-  } =
-    await client
-      .from('wallpapers')
-      .delete()
-      .eq('id', id);
+  } = await client
+    .from('wallpapers')
+    .delete()
+    .eq('id', id);
 
   if (error) {
-    console.error(
-      'Supabase delete error:',
-      error
-    );
-
     throw error;
   }
 }
 
-/**
- * ============================================================
- * UPDATE WALLPAPER STATS
- * ============================================================
- *
- * These are intentionally best-effort.
- * If your RLS policy does not allow public
- * stat updates, the UI will still work.
- */
+/* ============================================================
+   UPDATE WALLPAPER STATS
+   ============================================================ */
 
 export async function incrementStatsInSupabase(
   id: string,
@@ -809,12 +698,14 @@ export async function incrementStatsInSupabase(
     | 'favorites',
   incrementBy = 1
 ): Promise<void> {
-  const client =
-    getSupabaseClient();
+  const client = getSupabaseClient();
 
-  if (!client) {
-    return;
-  }
+  /*
+    Stats are deliberately handled through a controlled
+    database operation. If the current RLS policy does not
+    allow this client-side update, we simply don't break
+    the wallpaper experience.
+  */
 
   try {
     const {
@@ -831,9 +722,7 @@ export async function incrementStatsInSupabase(
     }
 
     const currentValue =
-      Number(
-        data[field] || 0
-      );
+      Number(data[field] || 0);
 
     await client
       .from('wallpapers')
@@ -844,64 +733,36 @@ export async function incrementStatsInSupabase(
       })
       .eq('id', id);
   } catch {
-    // Statistics should never break
-    // the user's wallpaper experience.
+    // Statistics should never break downloads/browsing.
   }
 }
 
-/**
- * ============================================================
- * SEED INITIAL WALLPAPERS
- * ADMIN ONLY
- * ============================================================
- */
+/* ============================================================
+   SEED DATABASE
+   ============================================================ */
 
 export async function seedInitialWallpapersToSupabase(
   initialWallpapers: Wallpaper[]
 ): Promise<Wallpaper[]> {
-  const client =
-    getSupabaseClient();
+  const client = getSupabaseClient();
 
-  if (!client) {
-    throw new Error(
-      'Supabase is not configured.'
-    );
-  }
-
-  const admin =
-    await isCurrentUserAdmin();
-
-  if (!admin) {
-    throw new Error(
-      'Unauthorized: only the Wallpaper Station administrator can seed the database.'
-    );
-  }
+  await requireAdmin();
 
   const dbPayloads =
     initialWallpapers.map(
       (wp) =>
-        mapWallpaperToDbPayload(
-          wp
-        )
+        mapWallpaperToDbPayload(wp)
     );
 
   const {
     data,
     error,
-  } =
-    await client
-      .from('wallpapers')
-      .insert(
-        dbPayloads
-      )
-      .select();
+  } = await client
+    .from('wallpapers')
+    .insert(dbPayloads)
+    .select();
 
   if (error) {
-    console.error(
-      'Supabase seed error:',
-      error
-    );
-
     throw error;
   }
 
