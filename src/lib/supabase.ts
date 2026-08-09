@@ -114,13 +114,10 @@ export const signInWithEmail = async (
     };
   }
 
-  const result =
-    await client.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-  return result;
+  return await client.auth.signInWithPassword({
+    email,
+    password,
+  });
 };
 
 export const signUpWithEmail = async (
@@ -142,19 +139,16 @@ export const signUpWithEmail = async (
     };
   }
 
-  const result =
-    await client.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: name || '',
-          name: name || '',
-        },
+  return await client.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name: name || '',
+        name: name || '',
       },
-    });
-
-  return result;
+    },
+  });
 };
 
 export const signOutUser = async () => {
@@ -370,9 +364,11 @@ export function mapWallpaperToDbPayload(
       wp.description ||
       '',
 
-    url: imageUrl,
+    url:
+      imageUrl,
 
-    image_url: imageUrl,
+    image_url:
+      imageUrl,
 
     thumbnail_url:
       wp.thumbnailUrl ||
@@ -432,7 +428,9 @@ export function mapWallpaperToDbPayload(
 
     author:
       wp.author || {
-        name: 'Station Creator',
+        name:
+          'Station Creator',
+
         avatar:
           'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
       },
@@ -446,7 +444,8 @@ export function mapWallpaperToDbPayload(
       null,
 
     is_featured:
-      wp.isFeatured ?? false,
+      wp.isFeatured ??
+      false,
 
     is_wallpaper_of_the_day:
       wp.isWallpaperOfTheDay ??
@@ -482,9 +481,12 @@ export async function fetchWallpapersFromSupabase(): Promise<
     await client
       .from('wallpapers')
       .select('*')
-      .order('created_at', {
-        ascending: false,
-      });
+      .order(
+        'created_at',
+        {
+          ascending: false,
+        }
+      );
 
   if (result.error) {
     console.error(
@@ -565,12 +567,6 @@ export async function uploadWallpaperFileAndSave({
         8
       );
 
-  /*
-   * IMPORTANT:
-   * This intentionally uses string concatenation
-   * instead of a template literal.
-   */
-
   const fileName =
     String(Date.now()) +
     '-' +
@@ -583,8 +579,6 @@ export async function uploadWallpaperFileAndSave({
   const filePath =
     'wallpapers/' +
     fileName;
-
-  /* Upload */
 
   const uploadResult =
     await client.storage
@@ -617,8 +611,6 @@ export async function uploadWallpaperFileAndSave({
     );
   }
 
-  /* Public URL */
-
   const publicResult =
     client.storage
       .from(bucketName)
@@ -635,8 +627,6 @@ export async function uploadWallpaperFileAndSave({
       'Image uploaded but Supabase did not return a public URL.'
     );
   }
-
-  /* Database payload */
 
   const dbPayload =
     mapWallpaperToDbPayload({
@@ -662,8 +652,6 @@ export async function uploadWallpaperFileAndSave({
           .toISOString()
           .split('T')[0],
     });
-
-  /* Insert database record */
 
   const insertResult =
     await client
@@ -836,12 +824,15 @@ export async function incrementStatsInSupabase(
         0
     );
 
+  const newValue =
+    currentValue +
+    incrementBy;
+
   await client
     .from('wallpapers')
     .update({
       [field]:
-        currentValue +
-        incrementBy,
+        newValue,
     })
     .eq(
       'id',
