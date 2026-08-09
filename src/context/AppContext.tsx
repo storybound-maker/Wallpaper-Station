@@ -67,9 +67,7 @@ export type ThemeMode =
 interface AppContextType {
   theme: ThemeMode;
   toggleTheme: () => void;
-  setTheme: (
-    theme: ThemeMode
-  ) => void;
+  setTheme: (theme: ThemeMode) => void;
 
   resetToDefaultWallpapers: () => void;
 
@@ -87,18 +85,14 @@ interface AppContextType {
 
   activePage: PageView;
 
-  setActivePage: (
-    page: PageView
-  ) => void;
+  setActivePage: (page: PageView) => void;
 
   selectedCategory:
     | CategoryName
     | 'All';
 
   setSelectedCategory: (
-    cat:
-      | CategoryName
-      | 'All'
+    cat: CategoryName | 'All'
   ) => void;
 
   selectedCollectionId:
@@ -155,9 +149,7 @@ interface AppContextType {
     error: Error | null;
   }>;
 
-  toggleFavorite: (
-    id: string
-  ) => void;
+  toggleFavorite: (id: string) => void;
 
   downloadWallpaper: (
     wp: Wallpaper,
@@ -218,15 +210,11 @@ interface AppContextType {
       | 'error'
   ) => void;
 
-  removeToast: (
-    id: string
-  ) => void;
+  removeToast: (id: string) => void;
 
   resetFilters: () => void;
 
-  triggerSearch: (
-    query: string
-  ) => void;
+  triggerSearch: (query: string) => void;
 
   seedSupabaseDatabase: () => Promise<void>;
 
@@ -243,9 +231,9 @@ const defaultFilters: FilterState = {
 };
 
 const AppContext =
-  createContext<
-    AppContextType | undefined
-  >(undefined);
+  createContext<AppContextType | undefined>(
+    undefined
+  );
 
 export const AppProvider: React.FC<{
   children: React.ReactNode;
@@ -255,9 +243,7 @@ export const AppProvider: React.FC<{
     setThemeState,
   ] = useState<ThemeMode>(() => {
     const saved =
-      localStorage.getItem(
-        'ws_theme'
-      );
+      localStorage.getItem('ws_theme');
 
     if (
       saved === 'light' ||
@@ -340,9 +326,9 @@ export const AppProvider: React.FC<{
   const [
     wallpaperError,
     setWallpaperError,
-  ] = useState<
-    string | null
-  >(null);
+  ] = useState<string | null>(
+    null
+  );
 
   const [
     isSupabaseConnected,
@@ -391,9 +377,7 @@ export const AppProvider: React.FC<{
 
     if (saved) {
       try {
-        return JSON.parse(
-          saved
-        );
+        return JSON.parse(saved);
       } catch {
         // Ignore invalid data
       }
@@ -418,9 +402,7 @@ export const AppProvider: React.FC<{
 
     if (saved) {
       try {
-        return JSON.parse(
-          saved
-        );
+        return JSON.parse(saved);
       } catch {
         // Ignore invalid data
       }
@@ -435,48 +417,42 @@ export const AppProvider: React.FC<{
   const [
     userCollections,
     setUserCollections,
-  ] = useState<Collection[]>(
-    () => {
-      const saved =
-        localStorage.getItem(
-          'ws_user_collections'
-        );
+  ] = useState<Collection[]>(() => {
+    const saved =
+      localStorage.getItem(
+        'ws_user_collections'
+      );
 
-      if (saved) {
-        try {
-          return JSON.parse(
-            saved
-          );
-        } catch (error) {
-          console.error(error);
-        }
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (error) {
+        console.error(error);
       }
-
-      return [
-        {
-          id: 'ucol-1',
-          title:
-            'Desktop Favorites',
-          description:
-            'Selected 4K backgrounds for wide high-resolution screens.',
-          coverUrl:
-            'https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=800&auto=format&fit=crop',
-          itemCount: 2,
-          wallpaperIds: [
-            'wp-1',
-            'wp-2',
-          ],
-        },
-      ];
     }
-  );
+
+    return [
+      {
+        id: 'ucol-1',
+        title:
+          'Desktop Favorites',
+        description:
+          'Selected 4K backgrounds for wide high-resolution screens.',
+        coverUrl:
+          'https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=800&auto=format&fit=crop',
+        itemCount: 2,
+        wallpaperIds: [
+          'wp-1',
+          'wp-2',
+        ],
+      },
+    ];
+  });
 
   const [
     toasts,
     setToasts,
-  ] = useState<
-    ToastMessage[]
-  >([]);
+  ] = useState<ToastMessage[]>([]);
 
   const removeToast =
     useCallback(
@@ -505,10 +481,7 @@ export const AppProvider: React.FC<{
           Date.now().toString() +
           Math.random()
             .toString(36)
-            .substring(
-              2,
-              5
-            );
+            .substring(2, 5);
 
         setToasts(
           (prev) => [
@@ -522,8 +495,7 @@ export const AppProvider: React.FC<{
         );
 
         setTimeout(
-          () =>
-            removeToast(id),
+          () => removeToast(id),
           4000
         );
       },
@@ -539,10 +511,7 @@ export const AppProvider: React.FC<{
       getSupabaseClient();
 
     if (!client) {
-      setIsAuthLoading(
-        false
-      );
-
+      setIsAuthLoading(false);
       return;
     }
 
@@ -562,18 +531,11 @@ export const AppProvider: React.FC<{
             );
           }
 
-          setSession(
-            session
-          );
-
+          setSession(session);
           setAuthUser(
-            session?.user ??
-              null
+            session?.user ?? null
           );
-
-          setIsAuthLoading(
-            false
-          );
+          setIsAuthLoading(false);
         }
       );
 
@@ -587,18 +549,13 @@ export const AppProvider: React.FC<{
           _event,
           session
         ) => {
-          setSession(
-            session
-          );
+          setSession(session);
 
           setAuthUser(
-            session?.user ??
-              null
+            session?.user ?? null
           );
 
-          setIsAuthLoading(
-            false
-          );
+          setIsAuthLoading(false);
         }
       );
 
@@ -615,6 +572,14 @@ export const AppProvider: React.FC<{
     authUser?.id ===
     ADMIN_SUPABASE_UID;
 
+  const avatarUrl =
+    authUser?.user_metadata
+      ?.avatar_url ||
+    'https://api.dicebear.com/7.x/bottts/svg?seed=' +
+      encodeURIComponent(
+        authUser?.email || 'guest'
+      );
+
   const user: UserProfile = {
     id:
       authUser?.id || '',
@@ -625,20 +590,14 @@ export const AppProvider: React.FC<{
       authUser?.user_metadata
         ?.name ||
       (authUser?.email
-        ? authUser.email.split(
-            '@'
-          )[0]
+        ? authUser.email.split('@')[0]
         : 'Guest User'),
 
     email:
       authUser?.email || '',
 
     avatar:
-      authUser?.user_metadata
-        ?.avatar_url ||
-      `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
-        authUser?.email || 'guest'
-      )}`,
+      avatarUrl,
 
     isLoggedIn:
       Boolean(authUser),
@@ -696,8 +655,7 @@ export const AppProvider: React.FC<{
       );
 
       return {
-        error:
-          err as Error,
+        error: err as Error,
       };
     }
   };
@@ -747,8 +705,7 @@ export const AppProvider: React.FC<{
       );
 
       return {
-        error:
-          err as Error,
+        error: err as Error,
         user: null,
       };
     }
@@ -810,8 +767,7 @@ export const AppProvider: React.FC<{
         );
 
         return {
-          error:
-            err as Error,
+          error: err as Error,
         };
       }
     };
@@ -823,9 +779,7 @@ export const AppProvider: React.FC<{
   const [
     activePage,
     setActivePage,
-  ] = useState<PageView>(
-    'home'
-  );
+  ] = useState<PageView>('home');
 
   const [
     selectedCategory,
@@ -837,16 +791,16 @@ export const AppProvider: React.FC<{
   const [
     selectedCollectionId,
     setSelectedCollectionId,
-  ] = useState<
-    string | null
-  >(null);
+  ] = useState<string | null>(
+    null
+  );
 
   const [
     activeWallpaper,
     setActiveWallpaper,
-  ] = useState<
-    Wallpaper | null
-  >(null);
+  ] = useState<Wallpaper | null>(
+    null
+  );
 
   const [
     filters,
@@ -867,16 +821,16 @@ export const AppProvider: React.FC<{
   const [
     adModalWallpaper,
     setAdModalWallpaper,
-  ] = useState<
-    Wallpaper | null
-  >(null);
+  ] = useState<Wallpaper | null>(
+    null
+  );
 
   const [
     adModalResolution,
     setAdModalResolution,
-  ] = useState<
-    ResolutionOption
-  >('8K');
+  ] = useState<ResolutionOption>(
+    '8K'
+  );
 
   // ---------------------------------------------------------
   // FETCH WALLPAPERS
@@ -885,13 +839,8 @@ export const AppProvider: React.FC<{
   const refetchWallpapers =
     useCallback(
       async () => {
-        setIsLoadingWallpapers(
-          true
-        );
-
-        setWallpaperError(
-          null
-        );
+        setIsLoadingWallpapers(true);
+        setWallpaperError(null);
 
         if (
           !isSupabaseConfigured()
@@ -919,9 +868,7 @@ export const AppProvider: React.FC<{
             data &&
             data.length > 0
           ) {
-            setWallpapers(
-              data
-            );
+            setWallpapers(data);
           } else {
             setWallpapers(
               INITIAL_WALLPAPERS
@@ -967,9 +914,7 @@ export const AppProvider: React.FC<{
   useEffect(() => {
     localStorage.setItem(
       'ws_favorite_ids',
-      JSON.stringify(
-        favoriteIds
-      )
+      JSON.stringify(favoriteIds)
     );
   }, [favoriteIds]);
 
@@ -1010,9 +955,7 @@ export const AppProvider: React.FC<{
     id: string
   ) => {
     const exists =
-      favoriteIds.includes(
-        id
-      );
+      favoriteIds.includes(id);
 
     const newFavs = exists
       ? favoriteIds.filter(
@@ -1024,9 +967,7 @@ export const AppProvider: React.FC<{
           id,
         ];
 
-    setFavoriteIds(
-      newFavs
-    );
+    setFavoriteIds(newFavs);
 
     setWallpapers(
       (wps) =>
@@ -1047,16 +988,12 @@ export const AppProvider: React.FC<{
         )
     );
 
-    if (
-      isSupabaseConnected
-    ) {
+    if (isSupabaseConnected) {
       incrementStatsInSupabase(
         id,
         'favorites',
         exists ? -1 : 1
-      ).catch(
-        () => {}
-      );
+      ).catch(() => {});
     }
 
     addToast(
@@ -1081,21 +1018,14 @@ export const AppProvider: React.FC<{
       isAdVerified = false
     ) => {
       if (
-        resolution ===
-          '8K' &&
+        resolution === '8K' &&
         !isAdVerified
       ) {
-        setAdModalWallpaper(
-          wp
-        );
+        setAdModalWallpaper(wp);
 
-        setAdModalResolution(
-          '8K'
-        );
+        setAdModalResolution('8K');
 
-        setIsAdModalOpen(
-          true
-        );
+        setIsAdModalOpen(true);
 
         return;
       }
@@ -1107,23 +1037,18 @@ export const AppProvider: React.FC<{
               ? {
                   ...w,
                   downloads:
-                    w.downloads +
-                    1,
+                    w.downloads + 1,
                 }
               : w
           )
       );
 
-      if (
-        isSupabaseConnected
-      ) {
+      if (isSupabaseConnected) {
         incrementStatsInSupabase(
           wp.id,
           'downloads',
           1
-        ).catch(
-          () => {}
-        );
+        ).catch(() => {});
       }
 
       setDownloadHistoryIds(
@@ -1137,12 +1062,15 @@ export const AppProvider: React.FC<{
       );
 
       const fileName =
-        `${wp.title
+        wp.title
           .toLowerCase()
           .replace(
             /[^a-z0-9]/g,
             '-'
-          )}-${resolution.toLowerCase()}.jpg`;
+          ) +
+        '-' +
+        resolution.toLowerCase() +
+        '.jpg';
 
       addToast(
         `Preparing download for ${wp.title} (${resolution})...`,
@@ -1150,28 +1078,19 @@ export const AppProvider: React.FC<{
       );
 
       if (
-        wp.url.startsWith(
-          'data:'
-        )
+        wp.url.startsWith('data:')
       ) {
         const link =
-          document.createElement(
-            'a'
-          );
+          document.createElement('a');
 
         link.href = wp.url;
-        link.download =
-          fileName;
+        link.download = fileName;
 
-        document.body.appendChild(
-          link
-        );
+        document.body.appendChild(link);
 
         link.click();
 
-        document.body.removeChild(
-          link
-        );
+        document.body.removeChild(link);
 
         addToast(
           `Downloaded ${wp.title}!`,
@@ -1183,44 +1102,28 @@ export const AppProvider: React.FC<{
 
       try {
         const response =
-          await fetch(
-            wp.url,
-            {
-              mode: 'cors',
-            }
-          );
+          await fetch(wp.url, {
+            mode: 'cors',
+          });
 
-        if (
-          response.ok
-        ) {
+        if (response.ok) {
           const blob =
             await response.blob();
 
           const blobUrl =
-            URL.createObjectURL(
-              blob
-            );
+            URL.createObjectURL(blob);
 
           const link =
-            document.createElement(
-              'a'
-            );
+            document.createElement('a');
 
-          link.href =
-            blobUrl;
+          link.href = blobUrl;
+          link.download = fileName;
 
-          link.download =
-            fileName;
-
-          document.body.appendChild(
-            link
-          );
+          document.body.appendChild(link);
 
           link.click();
 
-          document.body.removeChild(
-            link
-          );
+          document.body.removeChild(link);
 
           setTimeout(
             () =>
@@ -1244,28 +1147,17 @@ export const AppProvider: React.FC<{
       const fallbackLink =
         () => {
           const link =
-            document.createElement(
-              'a'
-            );
+            document.createElement('a');
 
-          link.href =
-            wp.url;
+          link.href = wp.url;
+          link.download = fileName;
+          link.target = '_blank';
 
-          link.download =
-            fileName;
-
-          link.target =
-            '_blank';
-
-          document.body.appendChild(
-            link
-          );
+          document.body.appendChild(link);
 
           link.click();
 
-          document.body.removeChild(
-            link
-          );
+          document.body.removeChild(link);
 
           addToast(
             `Opened image download link for ${wp.title}!`,
@@ -1287,17 +1179,13 @@ export const AppProvider: React.FC<{
             );
 
           canvas.width =
-            img.naturalWidth ||
-            1920;
+            img.naturalWidth || 1920;
 
           canvas.height =
-            img.naturalHeight ||
-            1080;
+            img.naturalHeight || 1080;
 
           const ctx =
-            canvas.getContext(
-              '2d'
-            );
+            canvas.getContext('2d');
 
           if (ctx) {
             ctx.drawImage(
@@ -1307,12 +1195,8 @@ export const AppProvider: React.FC<{
             );
 
             canvas.toBlob(
-              (
-                blob
-              ) => {
-                if (
-                  blob
-                ) {
+              (blob) => {
+                if (blob) {
                   const blobUrl =
                     URL.createObjectURL(
                       blob
@@ -1323,9 +1207,7 @@ export const AppProvider: React.FC<{
                       'a'
                     );
 
-                  link.href =
-                    blobUrl;
-
+                  link.href = blobUrl;
                   link.download =
                     fileName;
 
@@ -1371,8 +1253,7 @@ export const AppProvider: React.FC<{
           fallbackLink();
         };
 
-      img.src =
-        wp.url;
+      img.src = wp.url;
     };
 
   // ---------------------------------------------------------
@@ -1384,23 +1265,22 @@ export const AppProvider: React.FC<{
       title: string,
       description: string
     ) => {
-      const newCol: Collection =
-        {
-          id:
-            'ucol-' +
-            Date.now(),
+      const newCol: Collection = {
+        id:
+          'ucol-' +
+          Date.now(),
 
-          title,
+        title,
 
-          description,
+        description,
 
-          coverUrl:
-            'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop',
+        coverUrl:
+          'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop',
 
-          itemCount: 0,
+        itemCount: 0,
 
-          wallpaperIds: [],
-        };
+        wallpaperIds: [],
+      };
 
       setUserCollections(
         (prev) => [
@@ -1422,47 +1302,44 @@ export const AppProvider: React.FC<{
     ) => {
       setUserCollections(
         (prev) =>
-          prev.map(
-            (col) => {
-              if (
-                col.id !==
-                collectionId
-              ) {
-                return col;
-              }
+          prev.map((col) => {
+            if (
+              col.id !==
+              collectionId
+            ) {
+              return col;
+            }
 
-              if (
-                col.wallpaperIds.includes(
-                  wallpaperId
-                )
-              ) {
-                addToast(
-                  'Wallpaper is already in this collection',
-                  'info'
-                );
-
-                return col;
-              }
-
+            if (
+              col.wallpaperIds.includes(
+                wallpaperId
+              )
+            ) {
               addToast(
-                `Added to collection "${col.title}"`,
-                'success'
+                'Wallpaper is already in this collection',
+                'info'
               );
 
-              return {
-                ...col,
-
-                itemCount:
-                  col.itemCount +
-                  1,
-
-                wallpaperIds: [
-                  ...col.wallpaperIds,
-                  wallpaperId,
-                ],
-              };
+              return col;
             }
-          )
+
+            addToast(
+              `Added to collection "${col.title}"`,
+              'success'
+            );
+
+            return {
+              ...col,
+
+              itemCount:
+                col.itemCount + 1,
+
+              wallpaperIds: [
+                ...col.wallpaperIds,
+                wallpaperId,
+              ],
+            };
+          })
       );
     };
 
@@ -1484,9 +1361,7 @@ export const AppProvider: React.FC<{
         | 'thumbnailUrl'
       >
     ) => {
-      if (
-        !user.isAdmin
-      ) {
+      if (!user.isAdmin) {
         addToast(
           'Only the administrator UID can upload wallpapers.',
           'error'
@@ -1572,9 +1447,7 @@ export const AppProvider: React.FC<{
         | 'uploadDate'
       >
     ) => {
-      if (
-        !user.isAdmin
-      ) {
+      if (!user.isAdmin) {
         addToast(
           'Only the administrator UID can publish wallpapers.',
           'error'
@@ -1650,9 +1523,7 @@ export const AppProvider: React.FC<{
     async (
       id: string
     ) => {
-      if (
-        !user.isAdmin
-      ) {
+      if (!user.isAdmin) {
         addToast(
           'Only the administrator UID can delete wallpapers.',
           'error'
@@ -1689,18 +1560,14 @@ export const AppProvider: React.FC<{
       setWallpapers(
         (prev) =>
           prev.filter(
-            (w) =>
-              w.id !== id
+            (w) => w.id !== id
           )
       );
 
       if (
-        activeWallpaper?.id ===
-        id
+        activeWallpaper?.id === id
       ) {
-        setActiveWallpaper(
-          null
-        );
+        setActiveWallpaper(null);
       }
     };
 
@@ -1713,9 +1580,7 @@ export const AppProvider: React.FC<{
       id: string,
       updated: Partial<Wallpaper>
     ) => {
-      if (
-        !user.isAdmin
-      ) {
+      if (!user.isAdmin) {
         addToast(
           'Only the administrator UID can edit wallpapers.',
           'error'
@@ -1726,14 +1591,13 @@ export const AppProvider: React.FC<{
 
       setWallpapers(
         (prev) =>
-          prev.map(
-            (w) =>
-              w.id === id
-                ? {
-                    ...w,
-                    ...updated,
-                  }
-                : w
+          prev.map((w) =>
+            w.id === id
+              ? {
+                  ...w,
+                  ...updated,
+                }
+              : w
           )
       );
 
@@ -1775,9 +1639,7 @@ export const AppProvider: React.FC<{
           seeded &&
           seeded.length > 0
         ) {
-          setWallpapers(
-            seeded
-          );
+          setWallpapers(seeded);
 
           setIsSupabaseConnected(
             true
@@ -1823,14 +1685,11 @@ export const AppProvider: React.FC<{
       setFilters(
         (prev) => ({
           ...prev,
-          searchQuery:
-            query,
+          searchQuery: query,
         })
       );
 
-      setActivePage(
-        'search'
-      );
+      setActivePage('search');
     };
 
   // ---------------------------------------------------------
@@ -1920,9 +1779,7 @@ export const AppProvider: React.FC<{
 
 export const useApp = () => {
   const context =
-    useContext(
-      AppContext
-    );
+    useContext(AppContext);
 
   if (!context) {
     throw new Error(
