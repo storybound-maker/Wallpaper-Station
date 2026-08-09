@@ -1,3 +1,4 @@
+```tsx
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import {
   Wallpaper,
@@ -8,7 +9,7 @@ import {
 
 /* ============================================================
    SUPABASE CONFIGURATION
-   ============================================================ */
+============================================================ */
 
 export const getSupabaseConfig = () => {
   const customUrl =
@@ -49,8 +50,22 @@ export const isSupabaseConfigured = (): boolean => {
 };
 
 /* ============================================================
+   ADMIN CONFIGURATION
+============================================================ */
+
+/*
+ * This is the Supabase Auth UID of the Wallpaper Station
+ * administrator.
+ *
+ * IMPORTANT:
+ * This is a user UUID, not a Supabase service-role key.
+ */
+export const ADMIN_SUPABASE_UID =
+  '188791bc-6d87-4d28-8716-0f1efcad00e1';
+
+/* ============================================================
    SUPABASE CLIENT
-   ============================================================ */
+============================================================ */
 
 let clientInstance: SupabaseClient | null = null;
 
@@ -85,9 +100,11 @@ export const supabase: SupabaseClient | null =
 
 /* ============================================================
    DATABASE ROW -> WALLPAPER
-   ============================================================ */
+============================================================ */
 
-export function mapDbRowToWallpaper(row: any): Wallpaper {
+export function mapDbRowToWallpaper(
+  row: any
+): Wallpaper {
   return {
     id: String(row.id),
 
@@ -234,7 +251,7 @@ export function mapDbRowToWallpaper(row: any): Wallpaper {
 
 /* ============================================================
    WALLPAPER -> DATABASE PAYLOAD
-   ============================================================ */
+============================================================ */
 
 export function mapWallpaperToDbPayload(
   wp: Partial<Wallpaper>
@@ -342,12 +359,13 @@ export function mapWallpaperToDbPayload(
 
 /* ============================================================
    FETCH WALLPAPERS
-   ============================================================ */
+============================================================ */
 
 export async function fetchWallpapersFromSupabase(): Promise<
   Wallpaper[]
 > {
-  const client = getSupabaseClient();
+  const client =
+    getSupabaseClient();
 
   if (!client) {
     throw new Error(
@@ -381,7 +399,7 @@ export async function fetchWallpapersFromSupabase(): Promise<
 
 /* ============================================================
    UPLOAD FILE TO STORAGE + DATABASE
-   ============================================================ */
+============================================================ */
 
 export async function uploadWallpaperFileAndSave({
   file,
@@ -399,7 +417,8 @@ export async function uploadWallpaperFileAndSave({
     | 'thumbnailUrl'
   >;
 }): Promise<Wallpaper> {
-  const client = getSupabaseClient();
+  const client =
+    getSupabaseClient();
 
   if (!client) {
     throw new Error(
@@ -407,7 +426,8 @@ export async function uploadWallpaperFileAndSave({
     );
   }
 
-  const BUCKET_NAME = 'wallpapers';
+  const BUCKET_NAME =
+    'wallpapers';
 
   const fileExt =
     file.name
@@ -468,7 +488,9 @@ export async function uploadWallpaperFileAndSave({
     data: publicUrlData,
   } = client.storage
     .from(BUCKET_NAME)
-    .getPublicUrl(filePath);
+    .getPublicUrl(
+      filePath
+    );
 
   const publicUrl =
     publicUrlData?.publicUrl ||
@@ -530,7 +552,7 @@ export async function uploadWallpaperFileAndSave({
 
 /* ============================================================
    INSERT WALLPAPER USING EXISTING URL
-   ============================================================ */
+============================================================ */
 
 export async function insertWallpaperToSupabase(
   wpData: Omit<
@@ -542,7 +564,8 @@ export async function insertWallpaperToSupabase(
     | 'uploadDate'
   >
 ): Promise<Wallpaper> {
-  const client = getSupabaseClient();
+  const client =
+    getSupabaseClient();
 
   if (!client) {
     throw new Error(
@@ -584,17 +607,20 @@ export async function insertWallpaperToSupabase(
     );
   }
 
-  return mapDbRowToWallpaper(data);
+  return mapDbRowToWallpaper(
+    data
+  );
 }
 
 /* ============================================================
    DELETE WALLPAPER
-   ============================================================ */
+============================================================ */
 
 export async function deleteWallpaperFromSupabase(
   id: string
 ): Promise<void> {
-  const client = getSupabaseClient();
+  const client =
+    getSupabaseClient();
 
   if (!client) {
     throw new Error(
@@ -621,7 +647,7 @@ export async function deleteWallpaperFromSupabase(
 
 /* ============================================================
    UPDATE WALLPAPER STATS
-   ============================================================ */
+============================================================ */
 
 export async function incrementStatsInSupabase(
   id: string,
@@ -631,7 +657,8 @@ export async function incrementStatsInSupabase(
     | 'favorites',
   incrementBy = 1
 ): Promise<void> {
-  const client = getSupabaseClient();
+  const client =
+    getSupabaseClient();
 
   if (!client) {
     return;
@@ -665,12 +692,13 @@ export async function incrementStatsInSupabase(
 
 /* ============================================================
    SEED INITIAL WALLPAPERS
-   ============================================================ */
+============================================================ */
 
 export async function seedInitialWallpapersToSupabase(
   initialWallpapers: Wallpaper[]
 ): Promise<Wallpaper[]> {
-  const client = getSupabaseClient();
+  const client =
+    getSupabaseClient();
 
   if (!client) {
     throw new Error(
@@ -681,7 +709,9 @@ export async function seedInitialWallpapersToSupabase(
   const dbPayloads =
     initialWallpapers.map(
       (wp) =>
-        mapWallpaperToDbPayload(wp)
+        mapWallpaperToDbPayload(
+          wp
+        )
     );
 
   const {
@@ -708,7 +738,7 @@ export async function seedInitialWallpapersToSupabase(
 
 /* ============================================================
    SUPABASE SQL SCHEMA
-   ============================================================ */
+============================================================ */
 
 export const SUPABASE_SQL_SCHEMA = `
 create extension if not exists pgcrypto;
@@ -794,7 +824,8 @@ on public.wallpapers
 for insert
 to authenticated
 with check (
-  auth.uid() = '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
+  auth.uid() =
+    '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
 );
 
 create policy "Authenticated Admin Update"
@@ -802,10 +833,12 @@ on public.wallpapers
 for update
 to authenticated
 using (
-  auth.uid() = '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
+  auth.uid() =
+    '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
 )
 with check (
-  auth.uid() = '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
+  auth.uid() =
+    '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
 );
 
 create policy "Authenticated Admin Delete"
@@ -813,10 +846,8 @@ on public.wallpapers
 for delete
 to authenticated
 using (
-  auth.uid() = '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
+  auth.uid() =
+    '188791bc-6d87-4d28-8716-0f1efcad00e1'::uuid
 );
 `;
-
-/* ============================================================
-   END
-   ============================================================ */
+```
