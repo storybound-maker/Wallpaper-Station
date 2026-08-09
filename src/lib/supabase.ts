@@ -8,9 +8,12 @@ import {
 
 /**
  * ============================================================
- * SUPABASE CONFIGURATION
+ * WALLPAPER STATION - SUPABASE CONFIGURATION
  * ============================================================
  */
+
+export const ADMIN_UID =
+  '188791bc-6d87-4d28-8716-0f1efcad00e1';
 
 export const getSupabaseConfig = () => {
   const customUrl =
@@ -44,9 +47,9 @@ export const isSupabaseConfigured = (): boolean => {
 
   return Boolean(
     url &&
-    key &&
-    url.startsWith('https://') &&
-    key.length > 20
+      key &&
+      url.startsWith('https://') &&
+      key.length > 20
   );
 };
 
@@ -74,7 +77,13 @@ export const getSupabaseClient = (): SupabaseClient | null => {
   }
 
   if (!clientInstance) {
-    clientInstance = createClient(url, key);
+    clientInstance = createClient(url, key, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    });
   }
 
   return clientInstance;
@@ -84,8 +93,42 @@ export const resetSupabaseClientInstance = () => {
   clientInstance = null;
 };
 
-export const supabase: SupabaseClient | null =
-  getSupabaseClient();
+export const supabase = getSupabaseClient();
+
+/**
+ * ============================================================
+ * ADMIN AUTHENTICATION
+ * ============================================================
+ */
+
+export async function getCurrentSupabaseUser() {
+  const client = getSupabaseClient();
+
+  if (!client) {
+    return null;
+  }
+
+  const {
+    data: { user },
+    error,
+  } = await client.auth.getUser();
+
+  if (error) {
+    console.warn('Could not get Supabase user:', error.message);
+    return null;
+  }
+
+  return user;
+}
+
+export async function isCurrentUserAdmin(): Promise<boolean> {
+  const user = await getCurrentSupabaseUser();
+
+  return Boolean(
+    user &&
+      user.id === ADMIN_UID
+  );
+}
 
 /**
  * ============================================================
@@ -244,18 +287,12 @@ export function mapDbRowToWallpaper(row: any): Wallpaper {
  * ============================================================
  * WALLPAPER -> DATABASE PAYLOAD
  * ============================================================
- *
- * Your existing database has an image_url column
- * that is NOT NULL.
- *
- * Therefore we send BOTH image_url and url.
  */
 
 export function mapWallpaperToDbPayload(
   wp: Partial<Wallpaper>
 ) {
-  const imageUrl =
-    wp.url || '';
+  const imageUrl = wp.url || '';
 
   return {
     title:
@@ -266,11 +303,9 @@ export function mapWallpaperToDbPayload(
       wp.description ||
       '',
 
-    url:
-      imageUrl,
+    url: imageUrl,
 
-    image_url:
-      imageUrl,
+    image_url: imageUrl,
 
     thumbnail_url:
       wp.thumbnailUrl ||
@@ -403,6 +438,7 @@ export async function fetchWallpapersFromSupabase(): Promise<
 /**
  * ============================================================
  * UPLOAD FILE TO STORAGE + DATABASE
+ * ADMIN ONLY
  * ============================================================
  */
 
@@ -432,11 +468,42 @@ export async function uploadWallpaperFileAndSave({
     );
   }
 
+  /**
+   * Verify the actual Supabase session.
+   *
+   * This is NOT based on localStorage or
+   * the React user object.
+   */
+  const admin =
+    await isCurrentUserAdmin();
+
+  if (!admin) {
+    throw new Error(
+      'Unauthorized: only the Wallpaper Station administrator can upload wallpapers.'
+    );
+  }
+
   const BUCKET_NAME =
     'wallpapers';
 
   /**
-   * Create a safe unique filename.
+   * Validate file.
+   */
+
+  if (!file) {
+    throw new Error(
+      'No image file was selected.'
+    );
+  }
+
+  if (!file.type.startsWith('image/')) {
+    throw new Error(
+      'Only image files are allowed.'
+    );
+  }
+
+  /**
+   * Create safe unique filename.
    */
 
   const fileExt =
@@ -468,7 +535,7 @@ export async function uploadWallpaperFileAndSave({
 
   /**
    * ==========================================================
-   * 1. UPLOAD IMAGE
+   * 1. UPLOAD IMAGE TO STORAGE
    * ==========================================================
    */
 
@@ -526,7 +593,7 @@ export async function uploadWallpaperFileAndSave({
 
   /**
    * ==========================================================
-   * 3. SAVE METADATA
+   * 3. SAVE METADATA TO DATABASE
    * ==========================================================
    */
 
@@ -573,6 +640,19 @@ export async function uploadWallpaperFileAndSave({
       insertError
     );
 
+    /**
+     * If database insertion fails after
+     * storage upload, attempt to remove
+     * the orphaned image.
+     */
+
+    await client.storage
+      .from(BUCKET_NAME)
+      .remove([
+        filePath,
+      ])
+      .catch(() => {});
+
     throw new Error(
       `Image uploaded, but database insert failed: ${insertError.message}`
     );
@@ -586,6 +666,7 @@ export async function uploadWallpaperFileAndSave({
 /**
  * ============================================================
  * INSERT WALLPAPER USING EXISTING URL
+ * ADMIN ONLY
  * ============================================================
  */
 
@@ -605,6 +686,15 @@ export async function insertWallpaperToSupabase(
   if (!client) {
     throw new Error(
       'Supabase is not configured.'
+    );
+  }
+
+  const admin =
+    await isCurrentUserAdmin();
+
+  if (!admin) {
+    throw new Error(
+      'Unauthorized: only the Wallpaper Station administrator can publish wallpapers.'
     );
   }
 
@@ -658,6 +748,7 @@ export async function insertWallpaperToSupabase(
 /**
  * ============================================================
  * DELETE WALLPAPER
+ * ADMIN ONLY
  * ============================================================
  */
 
@@ -670,6 +761,15 @@ export async function deleteWallpaperFromSupabase(
   if (!client) {
     throw new Error(
       'Supabase is not configured.'
+    );
+  }
+
+  const admin =
+    await isCurrentUserAdmin();
+
+  if (!admin) {
+    throw new Error(
+      'Unauthorized: only the Wallpaper Station administrator can delete wallpapers.'
     );
   }
 
@@ -695,6 +795,10 @@ export async function deleteWallpaperFromSupabase(
  * ============================================================
  * UPDATE WALLPAPER STATS
  * ============================================================
+ *
+ * These are intentionally best-effort.
+ * If your RLS policy does not allow public
+ * stat updates, the UI will still work.
  */
 
 export async function incrementStatsInSupabase(
@@ -712,38 +816,43 @@ export async function incrementStatsInSupabase(
     return;
   }
 
-  const {
-    data,
-    error,
-  } =
-    await client
+  try {
+    const {
+      data,
+      error,
+    } = await client
       .from('wallpapers')
       .select(field)
       .eq('id', id)
       .single();
 
-  if (error || !data) {
-    return;
+    if (error || !data) {
+      return;
+    }
+
+    const currentValue =
+      Number(
+        data[field] || 0
+      );
+
+    await client
+      .from('wallpapers')
+      .update({
+        [field]:
+          currentValue +
+          incrementBy,
+      })
+      .eq('id', id);
+  } catch {
+    // Statistics should never break
+    // the user's wallpaper experience.
   }
-
-  const currentValue =
-    Number(
-      data[field] || 0
-    );
-
-  await client
-    .from('wallpapers')
-    .update({
-      [field]:
-        currentValue +
-        incrementBy,
-    })
-    .eq('id', id);
 }
 
 /**
  * ============================================================
  * SEED INITIAL WALLPAPERS
+ * ADMIN ONLY
  * ============================================================
  */
 
@@ -756,6 +865,15 @@ export async function seedInitialWallpapersToSupabase(
   if (!client) {
     throw new Error(
       'Supabase is not configured.'
+    );
+  }
+
+  const admin =
+    await isCurrentUserAdmin();
+
+  if (!admin) {
+    throw new Error(
+      'Unauthorized: only the Wallpaper Station administrator can seed the database.'
     );
   }
 
@@ -791,134 +909,3 @@ export async function seedInitialWallpapersToSupabase(
     mapDbRowToWallpaper
   );
 }
-
-/**
- * ============================================================
- * SQL SCHEMA
- * ============================================================
- */
-
-export const SUPABASE_SQL_SCHEMA = `
--- ============================================================
--- WALLPAPER STATION DATABASE
--- ============================================================
-
-create extension if not exists pgcrypto;
-
--- ============================================================
--- WALLPAPERS TABLE
--- ============================================================
-
-create table if not exists public.wallpapers (
-  id uuid default gen_random_uuid() primary key,
-
-  title text not null,
-
-  description text,
-
-  image_url text,
-
-  url text,
-
-  thumbnail_url text,
-
-  category text not null default 'Cyberpunk',
-
-  resolution text default '3840 x 2160',
-
-  resolution_tag text default '4K',
-
-  size text default '5.0 MB',
-
-  orientation text default 'landscape',
-
-  color_hex jsonb
-    default '["#0B1220", "#38BDF8", "#818CF8"]'::jsonb,
-
-  color_name text default 'Blue',
-
-  upload_date date default current_date,
-
-  views integer default 0,
-
-  downloads integer default 0,
-
-  favorites integer default 0,
-
-  tags jsonb default '[]'::jsonb,
-
-  author jsonb
-    default '{"name":"Station Creator"}'::jsonb,
-
-  author_name text default 'Station Creator',
-
-  author_avatar text default '',
-
-  is_featured boolean default false,
-
-  is_wallpaper_of_the_day boolean default false,
-
-  is_ai_generated boolean default false,
-
-  aspect_ratio text default '16:9',
-
-  created_at timestamptz default now()
-);
-
--- ============================================================
--- ENABLE RLS
--- ============================================================
-
-alter table public.wallpapers
-enable row level security;
-
--- ============================================================
--- DATABASE POLICIES
--- ============================================================
-
-drop policy if exists "Public Access Read"
-on public.wallpapers;
-
-drop policy if exists "Public Access Insert"
-on public.wallpapers;
-
-drop policy if exists "Public Access Update"
-on public.wallpapers;
-
-drop policy if exists "Public Access Delete"
-on public.wallpapers;
-
-create policy "Public Access Read"
-on public.wallpapers
-for select
-using (true);
-
-create policy "Public Access Insert"
-on public.wallpapers
-for insert
-with check (true);
-
-create policy "Public Access Update"
-on public.wallpapers
-for update
-using (true)
-with check (true);
-
-create policy "Public Access Delete"
-on public.wallpapers
-for delete
-using (true);
-
--- ============================================================
--- STORAGE
--- ============================================================
--- Storage bucket is created separately in Supabase.
--- Bucket name:
---
--- wallpapers
---
--- The application uploads to:
---
--- wallpapers/wallpapers/<filename>
--- ============================================================
-`;
