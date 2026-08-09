@@ -25,27 +25,15 @@ import { AdModal } from '../components/AdModal';
 
 import {
   isSupabaseConfigured,
-  getSupabaseClient,
   fetchWallpapersFromSupabase,
   uploadWallpaperFileAndSave,
   insertWallpaperToSupabase,
   deleteWallpaperFromSupabase,
   incrementStatsInSupabase,
   seedInitialWallpapersToSupabase,
+  getCurrentSupabaseUser,
+  ADMIN_UID,
 } from '../lib/supabase';
-
-/**
- * ============================================================
- * ADMIN CONFIGURATION
- * ============================================================
- *
- * This is your Supabase Auth user's UUID.
- *
- * IMPORTANT:
- * This is NOT a secret.
- * Your real protection comes from Supabase RLS policies.
- */
-const ADMIN_USER_ID = '188791bc-6d87-4d28-8716-0f1efcad00e1';
 
 export type PageView =
   | 'home'
@@ -62,42 +50,94 @@ export type PageView =
   | 'legal'
   | 'ai-generator';
 
-export type ThemeMode = 'dark' | 'light';
+export type ThemeMode =
+  | 'dark'
+  | 'light';
 
 interface AppContextType {
   theme: ThemeMode;
   toggleTheme: () => void;
-  setTheme: (theme: ThemeMode) => void;
+  setTheme: (
+    theme: ThemeMode
+  ) => void;
 
   resetToDefaultWallpapers: () => void;
 
   wallpapers: Wallpaper[];
+
   isLoadingWallpapers: boolean;
-  wallpaperError: string | null;
+
+  wallpaperError:
+    | string
+    | null;
+
   isSupabaseConnected: boolean;
 
   curatedCollections: Collection[];
+
   userCollections: Collection[];
 
   activePage: PageView;
-  setActivePage: (page: PageView) => void;
 
-  selectedCategory: CategoryName | 'All';
-  setSelectedCategory: (cat: CategoryName | 'All') => void;
+  setActivePage: (
+    page: PageView
+  ) => void;
 
-  selectedCollectionId: string | null;
-  setSelectedCollectionId: (colId: string | null) => void;
+  selectedCategory:
+    | CategoryName
+    | 'All';
 
-  activeWallpaper: Wallpaper | null;
-  setActiveWallpaper: (wp: Wallpaper | null) => void;
+  setSelectedCategory: (
+    cat:
+      | CategoryName
+      | 'All'
+  ) => void;
+
+  selectedCollectionId:
+    | string
+    | null;
+
+  setSelectedCollectionId: (
+    colId:
+      | string
+      | null
+  ) => void;
+
+  activeWallpaper:
+    | Wallpaper
+    | null;
+
+  setActiveWallpaper: (
+    wp:
+      | Wallpaper
+      | null
+  ) => void;
 
   filters: FilterState;
-  setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
+
+  setFilters: React.Dispatch<
+    React.SetStateAction<FilterState>
+  >;
 
   user: UserProfile;
-  setUser: React.Dispatch<React.SetStateAction<UserProfile>>;
 
-  toggleFavorite: (id: string) => void;
+  setUser: React.Dispatch<
+    React.SetStateAction<UserProfile>
+  >;
+
+  isAdmin: boolean;
+
+  isAdminMode: boolean;
+
+  setAdminMode: (
+    enabled: boolean
+  ) => void;
+
+  toggleAdminMode: () => void;
+
+  toggleFavorite: (
+    id: string
+  ) => void;
 
   downloadWallpaper: (
     wp: Wallpaper,
@@ -117,7 +157,11 @@ interface AppContextType {
   addWallpaper: (
     newWp: Omit<
       Wallpaper,
-      'id' | 'views' | 'downloads' | 'favorites' | 'uploadDate'
+      | 'id'
+      | 'views'
+      | 'downloads'
+      | 'favorites'
+      | 'uploadDate'
     >
   ) => Promise<void>;
 
@@ -135,7 +179,9 @@ interface AppContextType {
     >
   ) => Promise<void>;
 
-  deleteWallpaper: (id: string) => Promise<void>;
+  deleteWallpaper: (
+    id: string
+  ) => Promise<void>;
 
   editWallpaper: (
     id: string,
@@ -143,17 +189,27 @@ interface AppContextType {
   ) => void;
 
   toasts: ToastMessage[];
+
   addToast: (
     message: string,
-    type?: 'success' | 'info' | 'error'
+    type?:
+      | 'success'
+      | 'info'
+      | 'error'
   ) => void;
 
-  removeToast: (id: string) => void;
+  removeToast: (
+    id: string
+  ) => void;
 
   resetFilters: () => void;
-  triggerSearch: (query: string) => void;
+
+  triggerSearch: (
+    query: string
+  ) => void;
 
   seedSupabaseDatabase: () => Promise<void>;
+
   refetchWallpapers: () => Promise<void>;
 }
 
@@ -168,15 +224,19 @@ const defaultFilters: FilterState = {
 
 /**
  * IMPORTANT:
- * Do NOT make the default user an administrator.
  *
- * The real Supabase Auth session determines the user.
+ * We no longer hard-code isAdmin: true.
+ *
+ * The real Supabase authenticated user
+ * determines administrator status.
  */
+
 const defaultUser: UserProfile = {
   id: '',
-  name: '',
+  name: 'Guest',
   email: '',
-  avatar: '',
+  avatar:
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
   isLoggedIn: false,
   isAdmin: false,
   favoriteIds: [],
@@ -184,445 +244,633 @@ const defaultUser: UserProfile = {
   userCollections: [],
 };
 
-const AppContext = createContext<AppContextType | undefined>(
-  undefined
-);
+const AppContext =
+  createContext<
+    AppContextType | undefined
+  >(undefined);
 
 export const AppProvider: React.FC<{
   children: React.ReactNode;
-}> = ({ children }) => {
+}> = ({
+  children,
+}) => {
   /**
-   * ============================================================
+   * ==========================================================
    * THEME
-   * ============================================================
+   * ==========================================================
    */
 
-  const [theme, setThemeState] = useState<ThemeMode>(() => {
-    const saved = localStorage.getItem('ws_theme');
+  const [
+    theme,
+    setThemeState,
+  ] = useState<ThemeMode>(() => {
+    const saved =
+      localStorage.getItem(
+        'ws_theme'
+      );
 
-    if (saved === 'light' || saved === 'dark') {
+    if (
+      saved === 'light' ||
+      saved === 'dark'
+    ) {
       return saved;
     }
 
     return 'dark';
   });
 
-  const setTheme = useCallback((newTheme: ThemeMode) => {
-    setThemeState(newTheme);
-    localStorage.setItem('ws_theme', newTheme);
-  }, []);
+  const setTheme =
+    useCallback(
+      (
+        newTheme: ThemeMode
+      ) => {
+        setThemeState(
+          newTheme
+        );
 
-  const toggleTheme = useCallback(() => {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-  }, [theme, setTheme]);
+        localStorage.setItem(
+          'ws_theme',
+          newTheme
+        );
+      },
+      []
+    );
+
+  const toggleTheme =
+    useCallback(() => {
+      const next =
+        theme === 'dark'
+          ? 'light'
+          : 'dark';
+
+      setTheme(next);
+    }, [
+      theme,
+      setTheme,
+    ]);
 
   useEffect(() => {
-    if (theme === 'light') {
-      document.documentElement.classList.add('light');
-      document.documentElement.classList.remove('dark');
+    if (
+      theme === 'light'
+    ) {
+      document.documentElement.classList.add(
+        'light'
+      );
+
+      document.documentElement.classList.remove(
+        'dark'
+      );
     } else {
-      document.documentElement.classList.add('dark');
-      document.documentElement.classList.remove('light');
+      document.documentElement.classList.add(
+        'dark'
+      );
+
+      document.documentElement.classList.remove(
+        'light'
+      );
     }
   }, [theme]);
 
   /**
-   * ============================================================
+   * ==========================================================
    * WALLPAPERS
-   * ============================================================
+   * ==========================================================
    */
 
-  const [wallpapers, setWallpapers] =
-    useState<Wallpaper[]>(INITIAL_WALLPAPERS);
+  const [
+    wallpapers,
+    setWallpapers,
+  ] = useState<Wallpaper[]>(
+    INITIAL_WALLPAPERS
+  );
 
-  const resetToDefaultWallpapers = useCallback(() => {
-    localStorage.removeItem('ws_wallpapers');
-    setWallpapers(INITIAL_WALLPAPERS);
-  }, []);
+  const [
+    isLoadingWallpapers,
+    setIsLoadingWallpapers,
+  ] = useState(true);
 
-  const [isLoadingWallpapers, setIsLoadingWallpapers] =
-    useState(true);
+  const [
+    wallpaperError,
+    setWallpaperError,
+  ] = useState<
+    string | null
+  >(null);
 
-  const [wallpaperError, setWallpaperError] =
-    useState<string | null>(null);
+  const [
+    isSupabaseConnected,
+    setIsSupabaseConnected,
+  ] = useState(
+    isSupabaseConfigured()
+  );
 
-  const [isSupabaseConnected, setIsSupabaseConnected] =
-    useState(isSupabaseConfigured());
-
-  const [curatedCollections] =
-    useState<Collection[]>(CURATED_COLLECTIONS);
-
-  /**
-   * ============================================================
-   * AUTHENTICATED USER
-   * ============================================================
-   */
-
-  const [user, setUser] = useState<UserProfile>(defaultUser);
-
-  /**
-   * Convert Supabase Auth user into the application's UserProfile.
-   */
-  const buildUserProfile = useCallback(
-    (authUser: any): UserProfile => {
-      if (!authUser) {
-        return defaultUser;
-      }
-
-      const isAdmin =
-        authUser.id === ADMIN_USER_ID;
-
-      return {
-        id: authUser.id,
-
-        name:
-          authUser.user_metadata?.full_name ||
-          authUser.user_metadata?.name ||
-          authUser.email?.split('@')[0] ||
-          'User',
-
-        email: authUser.email || '',
-
-        avatar:
-          authUser.user_metadata?.avatar_url ||
-          '',
-
-        isLoggedIn: true,
-
-        /**
-         * Admin is determined ONLY from the Supabase Auth UID.
-         */
-        isAdmin,
-
-        favoriteIds: [],
-
-        downloadHistoryIds: [],
-
-        userCollections: [],
-      };
-    },
-    []
+  const [
+    curatedCollections,
+  ] = useState<
+    Collection[]
+  >(
+    CURATED_COLLECTIONS
   );
 
   /**
-   * ============================================================
-   * AUTH INITIALIZATION
-   * ============================================================
+   * ==========================================================
+   * REAL SUPABASE USER
+   * ==========================================================
+   */
+
+  const [
+    user,
+    setUser,
+  ] = useState<UserProfile>(
+    defaultUser
+  );
+
+  const [
+    isAdmin,
+    setIsAdmin,
+  ] = useState(false);
+
+  const [
+    isAdminMode,
+    setIsAdminMode,
+  ] = useState(false);
+
+  /**
+   * Load actual Supabase
+   * authenticated user.
    */
 
   useEffect(() => {
-    const client = getSupabaseClient();
-
-    if (!client) {
-      console.warn(
-        'Supabase client unavailable. User is treated as logged out.'
-      );
-
-      setUser(defaultUser);
-      return;
-    }
-
     let mounted = true;
 
-    /**
-     * Get the current authenticated session.
-     */
-    const loadSession = async () => {
-      const {
-        data,
-        error,
-      } = await client.auth.getSession();
+    const loadAuthUser =
+      async () => {
+        try {
+          const authUser =
+            await getCurrentSupabaseUser();
 
-      if (error) {
-        console.error(
-          'Could not load Supabase session:',
-          error
-        );
+          if (
+            !mounted
+          ) {
+            return;
+          }
 
-        if (mounted) {
-          setUser(defaultUser);
-        }
+          if (
+            authUser
+          ) {
+            const admin =
+              authUser.id ===
+              ADMIN_UID;
 
-        return;
-      }
+            setIsAdmin(
+              admin
+            );
 
-      if (!mounted) return;
+            /**
+             * Keep existing local
+             * favorites/history if
+             * available, but use the
+             * real authenticated
+             * identity.
+             */
 
-      if (data.session?.user) {
-        setUser(
-          buildUserProfile(data.session.user)
-        );
-      } else {
-        setUser(defaultUser);
-      }
-    };
+            setUser(
+              (previous) => ({
+                ...previous,
 
-    loadSession();
+                id:
+                  authUser.id,
 
-    /**
-     * Keep React state synchronized with Supabase Auth.
-     */
-    const {
-      data: authListener,
-    } = client.auth.onAuthStateChange(
-      (_event, session) => {
-        if (!mounted) return;
+                name:
+                  authUser.user_metadata
+                    ?.full_name ||
+                  authUser.user_metadata
+                    ?.name ||
+                  authUser.email ||
+                  'Wallpaper Station User',
 
-        if (session?.user) {
-          setUser(
-            buildUserProfile(session.user)
+                email:
+                  authUser.email ||
+                  '',
+
+                avatar:
+                  authUser.user_metadata
+                    ?.avatar_url ||
+                  previous.avatar,
+
+                isLoggedIn:
+                  true,
+
+                isAdmin:
+                  admin,
+              })
+            );
+          } else {
+            setIsAdmin(
+              false
+            );
+
+            setIsAdminMode(
+              false
+            );
+
+            setUser(
+              defaultUser
+            );
+          }
+        } catch (error) {
+          console.error(
+            'Auth initialization failed:',
+            error
           );
-        } else {
-          setUser(defaultUser);
         }
-      }
-    );
+      };
+
+    loadAuthUser();
 
     return () => {
       mounted = false;
-      authListener.subscription.unsubscribe();
     };
-  }, [buildUserProfile]);
+  }, []);
 
   /**
-   * ============================================================
-   * USER COLLECTIONS
-   * ============================================================
+   * Automatically close Admin Suite
+   * if the user is not an admin.
    */
 
-  const [userCollections, setUserCollections] =
-    useState<Collection[]>(() => {
-      const saved =
-        localStorage.getItem(
-          'ws_user_collections'
-        );
+  useEffect(() => {
+    if (!isAdmin) {
+      setIsAdminMode(
+        false
+      );
+    }
+  }, [isAdmin]);
 
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          console.error(e);
+  /**
+   * Admin Suite controls.
+   */
+
+  const setAdminMode =
+    useCallback(
+      (
+        enabled: boolean
+      ) => {
+        if (
+          !isAdmin
+        ) {
+          setIsAdminMode(
+            false
+          );
+          return;
         }
-      }
 
-      return [
-        {
-          id: 'ucol-1',
-          title: 'Desktop Favorites',
-          description:
-            'Selected 4K backgrounds for wide high-resolution screens.',
-          coverUrl:
-            'https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=800&auto=format&fit=crop',
-          itemCount: 2,
-          wallpaperIds: ['wp-1', 'wp-2'],
-        },
-      ];
-    });
+        setIsAdminMode(
+          enabled
+        );
+      },
+      [isAdmin]
+    );
 
-  /**
-   * ============================================================
-   * NAVIGATION / FILTERS
-   * ============================================================
-   */
-
-  const [activePage, setActivePage] =
-    useState<PageView>('home');
-
-  const [selectedCategory, setSelectedCategory] =
-    useState<CategoryName | 'All'>('All');
-
-  const [selectedCollectionId, setSelectedCollectionId] =
-    useState<string | null>(null);
-
-  const [activeWallpaper, setActiveWallpaper] =
-    useState<Wallpaper | null>(null);
-
-  const [filters, setFilters] =
-    useState<FilterState>(defaultFilters);
-
-  const [toasts, setToasts] =
-    useState<ToastMessage[]>([]);
-
-  /**
-   * ============================================================
-   * AD DOWNLOAD MODAL
-   * ============================================================
-   */
-
-  const [isAdModalOpen, setIsAdModalOpen] =
-    useState(false);
-
-  const [adModalWallpaper, setAdModalWallpaper] =
-    useState<Wallpaper | null>(null);
-
-  const [adModalResolution, setAdModalResolution] =
-    useState<ResolutionOption>('8K');
-
-  /**
-   * ============================================================
-   * TOASTS
-   * ============================================================
-   */
-
-  const removeToast = useCallback(
-    (id: string) => {
-      setToasts((prev) =>
-        prev.filter((t) => t.id !== id)
-      );
-    },
-    []
-  );
-
-  const addToast = useCallback(
-    (
-      message: string,
-      type: 'success' | 'info' | 'error' = 'success'
-    ) => {
-      const id =
-        Date.now().toString() +
-        Math.random()
-          .toString(36)
-          .substring(2, 5);
-
-      setToasts((prev) => [
-        ...prev,
-        {
-          id,
-          type,
-          message,
-        },
-      ]);
-
-      setTimeout(() => {
-        removeToast(id);
-      }, 4000);
-    },
-    [removeToast]
-  );
-
-  /**
-   * ============================================================
-   * ADMIN SECURITY HELPER
-   * ============================================================
-   *
-   * This prevents normal users from even attempting admin
-   * operations through the frontend.
-   *
-   * Supabase RLS remains the actual security boundary.
-   */
-
-  const requireAdmin = useCallback((): boolean => {
-    if (!user.isLoggedIn) {
-      addToast(
-        'You must be logged in to perform this action.',
-        'error'
-      );
-
-      return false;
-    }
-
-    if (!user.isAdmin) {
-      addToast(
-        'You do not have administrator permission.',
-        'error'
-      );
-
-      return false;
-    }
-
-    return true;
-  }, [user.isLoggedIn, user.isAdmin, addToast]);
-
-  /**
-   * ============================================================
-   * LOAD WALLPAPERS FROM SUPABASE
-   * ============================================================
-   */
-
-  const refetchWallpapers = useCallback(
-    async () => {
-      setIsLoadingWallpapers(true);
-      setWallpaperError(null);
-
-      if (!isSupabaseConfigured()) {
-        setIsSupabaseConnected(false);
-        setIsLoadingWallpapers(false);
+  const toggleAdminMode =
+    useCallback(() => {
+      if (
+        !isAdmin
+      ) {
+        setIsAdminMode(
+          false
+        );
         return;
       }
 
+      setIsAdminMode(
+        (previous) =>
+          !previous
+      );
+    }, [isAdmin]);
+
+  /**
+   * ==========================================================
+   * USER COLLECTIONS
+   * ==========================================================
+   */
+
+  const [
+    userCollections,
+    setUserCollections,
+  ] = useState<
+    Collection[]
+  >(() => {
+    const saved =
+      localStorage.getItem(
+        'ws_user_collections'
+      );
+
+    if (saved) {
       try {
-        const data =
-          await fetchWallpapersFromSupabase();
+        return JSON.parse(
+          saved
+        );
+      } catch {
+        // Continue to default.
+      }
+    }
 
-        setIsSupabaseConnected(true);
+    return [
+      {
+        id:
+          'ucol-1',
 
-        if (data && data.length > 0) {
-          setWallpapers(data);
-        } else {
-          setWallpapers(INITIAL_WALLPAPERS);
+        title:
+          'Desktop Favorites',
+
+        description:
+          'Selected 4K backgrounds for wide high-resolution screens.',
+
+        coverUrl:
+          'https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=800&auto=format&fit=crop',
+
+        itemCount: 2,
+
+        wallpaperIds: [
+          'wp-1',
+          'wp-2',
+        ],
+      },
+    ];
+  });
+
+  /**
+   * ==========================================================
+   * NAVIGATION
+   * ==========================================================
+   */
+
+  const [
+    activePage,
+    setActivePageState,
+  ] = useState<PageView>(
+    'home'
+  );
+
+  /**
+   * Prevent non-admin users
+   * from opening the Admin page.
+   */
+
+  const setActivePage =
+    useCallback(
+      (
+        page: PageView
+      ) => {
+        if (
+          page ===
+            'admin' &&
+          !isAdmin
+        ) {
+          return;
         }
-      } catch (err: any) {
-        console.warn(
-          'Could not fetch wallpapers from Supabase:',
-          err
+
+        setActivePageState(
+          page
+        );
+      },
+      [isAdmin]
+    );
+
+  const [
+    selectedCategory,
+    setSelectedCategory,
+  ] = useState<
+    CategoryName | 'All'
+  >('All');
+
+  const [
+    selectedCollectionId,
+    setSelectedCollectionId,
+  ] = useState<
+    string | null
+  >(null);
+
+  const [
+    activeWallpaper,
+    setActiveWallpaper,
+  ] = useState<
+    Wallpaper | null
+  >(null);
+
+  const [
+    filters,
+    setFilters,
+  ] = useState(
+    defaultFilters
+  );
+
+  const [
+    toasts,
+    setToasts,
+  ] = useState<
+    ToastMessage[]
+  >([]);
+
+  /**
+   * ==========================================================
+   * AD MODAL
+   * ==========================================================
+   */
+
+  const [
+    isAdModalOpen,
+    setIsAdModalOpen,
+  ] = useState(false);
+
+  const [
+    adModalWallpaper,
+    setAdModalWallpaper,
+  ] = useState<
+    Wallpaper | null
+  >(null);
+
+  const [
+    adModalResolution,
+    setAdModalResolution,
+  ] = useState<
+    ResolutionOption
+  >('8K');
+
+  /**
+   * ==========================================================
+   * TOASTS
+   * ==========================================================
+   */
+
+  const removeToast =
+    useCallback(
+      (id: string) => {
+        setToasts(
+          (previous) =>
+            previous.filter(
+              (toast) =>
+                toast.id !==
+                id
+            )
+        );
+      },
+      []
+    );
+
+  const addToast =
+    useCallback(
+      (
+        message: string,
+        type:
+          | 'success'
+          | 'info'
+          | 'error' = 'success'
+      ) => {
+        const id =
+          Date.now().toString() +
+          Math.random()
+            .toString(36)
+            .substring(
+              2,
+              5
+            );
+
+        setToasts(
+          (previous) => [
+            ...previous,
+            {
+              id,
+              type,
+              message,
+            },
+          ]
         );
 
-        setIsSupabaseConnected(false);
+        setTimeout(
+          () =>
+            removeToast(
+              id
+            ),
+          4000
+        );
+      },
+      [removeToast]
+    );
+
+  /**
+   * ==========================================================
+   * FETCH WALLPAPERS
+   * ==========================================================
+   */
+
+  const refetchWallpapers =
+    useCallback(
+      async () => {
+        setIsLoadingWallpapers(
+          true
+        );
 
         setWallpaperError(
-          err?.message ||
-            'Could not connect to Supabase.'
+          null
         );
 
-        const saved =
-          localStorage.getItem(
-            'ws_wallpapers'
+        if (
+          !isSupabaseConfigured()
+        ) {
+          setIsSupabaseConnected(
+            false
           );
 
-        if (saved) {
-          try {
+          setIsLoadingWallpapers(
+            false
+          );
+
+          return;
+        }
+
+        try {
+          const data =
+            await fetchWallpapersFromSupabase();
+
+          setIsSupabaseConnected(
+            true
+          );
+
+          if (
+            data &&
+            data.length >
+              0
+          ) {
             setWallpapers(
-              JSON.parse(saved)
+              data
             );
-          } catch {
+          } else {
             setWallpapers(
               INITIAL_WALLPAPERS
             );
           }
-        } else {
+        } catch (
+          error: any
+        ) {
+          console.warn(
+            'Could not fetch wallpapers from Supabase:',
+            error
+          );
+
+          setIsSupabaseConnected(
+            false
+          );
+
+          setWallpaperError(
+            error?.message ||
+              'Could not connect to the Supabase wallpapers table.'
+          );
+
+          /**
+           * IMPORTANT:
+           *
+           * Do NOT restore image Data URLs
+           * from localStorage.
+           *
+           * That was the source of the
+           * QuotaExceededError.
+           */
+
           setWallpapers(
             INITIAL_WALLPAPERS
           );
+        } finally {
+          setIsLoadingWallpapers(
+            false
+          );
         }
-      } finally {
-        setIsLoadingWallpapers(false);
-      }
-    },
-    []
-  );
+      },
+      []
+    );
 
   useEffect(() => {
     refetchWallpapers();
-  }, [refetchWallpapers]);
+  }, [
+    refetchWallpapers,
+  ]);
 
   /**
-   * ============================================================
-   * LOCAL BACKUPS
-   * ============================================================
+   * ==========================================================
+   * LOCAL STORAGE
+   * ==========================================================
+   *
+   * We deliberately DO NOT save wallpapers
+   * into localStorage anymore.
+   *
+   * Images belong in Supabase Storage.
    */
 
   useEffect(() => {
     localStorage.setItem(
-      'ws_wallpapers',
-      JSON.stringify(wallpapers)
-    );
-  }, [wallpapers]);
-
-  useEffect(() => {
-    localStorage.setItem(
       'ws_user_profile',
-      JSON.stringify(user)
+      JSON.stringify(
+        user
+      )
     );
   }, [user]);
 
@@ -633,12 +881,14 @@ export const AppProvider: React.FC<{
         userCollections
       )
     );
-  }, [userCollections]);
+  }, [
+    userCollections,
+  ]);
 
   /**
-   * ============================================================
-   * SCROLL
-   * ============================================================
+   * ==========================================================
+   * PAGE SCROLL
+   * ==========================================================
    */
 
   useEffect(() => {
@@ -649,183 +899,237 @@ export const AppProvider: React.FC<{
   }, [activePage]);
 
   /**
-   * ============================================================
-   * FAVORITES
-   * ============================================================
+   * ==========================================================
+   * RESET WALLPAPERS
+   * ==========================================================
    */
 
-  const toggleFavorite = (
-    id: string
-  ) => {
-    setUser((prev) => {
-      const exists =
-        prev.favoriteIds.includes(id);
+  const resetToDefaultWallpapers =
+    useCallback(() => {
+      /**
+       * This only resets the browser's
+       * displayed state.
+       *
+       * It does NOT delete your Supabase
+       * wallpapers.
+       */
 
-      const newFavs = exists
-        ? prev.favoriteIds.filter(
-            (favId) =>
-              favId !== id
-          )
-        : [
-            ...prev.favoriteIds,
-            id,
-          ];
-
-      setWallpapers((wps) =>
-        wps.map((wp) =>
-          wp.id === id
-            ? {
-                ...wp,
-                favorites:
-                  wp.favorites +
-                  (exists
-                    ? -1
-                    : 1),
-              }
-            : wp
-        )
+      setWallpapers(
+        INITIAL_WALLPAPERS
       );
-
-      if (isSupabaseConnected) {
-        incrementStatsInSupabase(
-          id,
-          'favorites',
-          exists ? -1 : 1
-        ).catch(() => {});
-      }
 
       addToast(
-        exists
-          ? 'Removed wallpaper from favorites'
-          : 'Saved wallpaper to favorites!',
-        exists
-          ? 'info'
-          : 'success'
+        'Local wallpaper display reset.',
+        'info'
       );
-
-      return {
-        ...prev,
-        favoriteIds: newFavs,
-      };
-    });
-  };
+    }, [addToast]);
 
   /**
-   * ============================================================
-   * DOWNLOAD WALLPAPER
-   * ============================================================
+   * ==========================================================
+   * FAVORITES
+   * ==========================================================
    */
 
-  const downloadWallpaper = async (
-    wp: Wallpaper,
-    resolution: ResolutionOption = '4K',
-    isAdVerified = false
-  ) => {
-    if (
-      resolution === '8K' &&
-      !isAdVerified
-    ) {
-      setAdModalWallpaper(wp);
-      setAdModalResolution('8K');
-      setIsAdModalOpen(true);
-      return;
-    }
+  const toggleFavorite =
+    useCallback(
+      (
+        id: string
+      ) => {
+        setUser(
+          (previous) => {
+            const exists =
+              previous.favoriteIds.includes(
+                id
+              );
 
-    setWallpapers((prev) =>
-      prev.map((w) =>
-        w.id === wp.id
-          ? {
-              ...w,
-              downloads:
-                w.downloads + 1,
+            const newFavorites =
+              exists
+                ? previous.favoriteIds.filter(
+                    (
+                      favoriteId
+                    ) =>
+                      favoriteId !==
+                      id
+                  )
+                : [
+                    ...previous.favoriteIds,
+                    id,
+                  ];
+
+            setWallpapers(
+              (previousWallpapers) =>
+                previousWallpapers.map(
+                  (
+                    wallpaper
+                  ) =>
+                    wallpaper.id ===
+                    id
+                      ? {
+                          ...wallpaper,
+
+                          favorites:
+                            Math.max(
+                              0,
+                              wallpaper.favorites +
+                                (exists
+                                  ? -1
+                                  : 1)
+                            ),
+                        }
+                      : wallpaper
+                )
+            );
+
+            if (
+              isSupabaseConnected
+            ) {
+              incrementStatsInSupabase(
+                id,
+                'favorites',
+                exists
+                  ? -1
+                  : 1
+              ).catch(
+                () => {}
+              );
             }
-          : w
-      )
+
+            addToast(
+              exists
+                ? 'Removed wallpaper from favorites'
+                : 'Saved wallpaper to favorites!',
+              exists
+                ? 'info'
+                : 'success'
+            );
+
+            return {
+              ...previous,
+
+              favoriteIds:
+                newFavorites,
+            };
+          }
+        );
+      },
+      [
+        isSupabaseConnected,
+        addToast,
+      ]
     );
 
-    if (isSupabaseConnected) {
-      incrementStatsInSupabase(
-        wp.id,
-        'downloads',
-        1
-      ).catch(() => {});
-    }
+  /**
+   * ==========================================================
+   * DOWNLOAD
+   * ==========================================================
+   */
 
-    setUser((prev) => ({
-      ...prev,
-      downloadHistoryIds:
-        Array.from(
-          new Set([
-            wp.id,
-            ...prev.downloadHistoryIds,
-          ])
-        ),
-    }));
-
-    const fileName =
-      `${wp.title
-        .toLowerCase()
-        .replace(
-          /[^a-z0-9]/g,
-          '-'
-        )}-${resolution.toLowerCase()}.jpg`;
-
-    addToast(
-      `Preparing download for ${wp.title} (${resolution})...`,
-      'info'
-    );
-
-    if (
-      wp.url.startsWith('data:')
-    ) {
-      const link =
-        document.createElement(
-          'a'
+  const downloadWallpaper =
+    async (
+      wp: Wallpaper,
+      resolution:
+        ResolutionOption = '4K',
+      isAdVerified = false
+    ) => {
+      if (
+        resolution ===
+          '8K' &&
+        !isAdVerified
+      ) {
+        setAdModalWallpaper(
+          wp
         );
 
-      link.href = wp.url;
-      link.download = fileName;
+        setAdModalResolution(
+          '8K'
+        );
 
-      document.body.appendChild(
-        link
+        setIsAdModalOpen(
+          true
+        );
+
+        return;
+      }
+
+      setWallpapers(
+        (previous) =>
+          previous.map(
+            (wallpaper) =>
+              wallpaper.id ===
+              wp.id
+                ? {
+                    ...wallpaper,
+
+                    downloads:
+                      wallpaper.downloads +
+                      1,
+                  }
+                : wallpaper
+          )
       );
 
-      link.click();
+      if (
+        isSupabaseConnected
+      ) {
+        incrementStatsInSupabase(
+          wp.id,
+          'downloads',
+          1
+        ).catch(
+          () => {}
+        );
+      }
 
-      document.body.removeChild(
-        link
+      setUser(
+        (previous) => ({
+          ...previous,
+
+          downloadHistoryIds:
+            Array.from(
+              new Set([
+                wp.id,
+                ...previous.downloadHistoryIds,
+              ])
+            ),
+        })
       );
+
+      const fileName =
+        `${wp.title
+          .toLowerCase()
+          .replace(
+            /[^a-z0-9]/g,
+            '-'
+          )}-${resolution.toLowerCase()}.jpg`;
 
       addToast(
-        `Downloaded ${wp.title}!`,
-        'success'
+        `Preparing download for ${wp.title} (${resolution})...`,
+        'info'
       );
 
-      return;
-    }
+      /**
+       * Data URLs are only supported for
+       * old/demo wallpapers.
+       *
+       * Uploaded wallpapers should use
+       * normal Supabase URLs.
+       */
 
-    try {
-      const response =
-        await fetch(wp.url, {
-          mode: 'cors',
-        });
-
-      if (response.ok) {
-        const blob =
-          await response.blob();
-
-        const blobUrl =
-          URL.createObjectURL(
-            blob
-          );
-
+      if (
+        wp.url.startsWith(
+          'data:'
+        )
+      ) {
         const link =
           document.createElement(
             'a'
           );
 
-        link.href = blobUrl;
-        link.download = fileName;
+        link.href =
+          wp.url;
+
+        link.download =
+          fileName;
 
         document.body.appendChild(
           link
@@ -837,32 +1141,91 @@ export const AppProvider: React.FC<{
           link
         );
 
-        setTimeout(() => {
-          URL.revokeObjectURL(
-            blobUrl
-          );
-        }, 10000);
-
         addToast(
-          `Downloaded ${wp.title} (${resolution})!`,
+          `Downloaded ${wp.title}!`,
           'success'
         );
 
         return;
       }
-    } catch {
-      // Continue to fallback.
-    }
 
-    const fallbackLink = () => {
+      try {
+        const response =
+          await fetch(
+            wp.url,
+            {
+              mode: 'cors',
+            }
+          );
+
+        if (
+          response.ok
+        ) {
+          const blob =
+            await response.blob();
+
+          const blobUrl =
+            URL.createObjectURL(
+              blob
+            );
+
+          const link =
+            document.createElement(
+              'a'
+            );
+
+          link.href =
+            blobUrl;
+
+          link.download =
+            fileName;
+
+          document.body.appendChild(
+            link
+          );
+
+          link.click();
+
+          document.body.removeChild(
+            link
+          );
+
+          setTimeout(
+            () =>
+              URL.revokeObjectURL(
+                blobUrl
+              ),
+            10000
+          );
+
+          addToast(
+            `Downloaded ${wp.title} (${resolution})!`,
+            'success'
+          );
+
+          return;
+        }
+      } catch {
+        // Continue to fallback.
+      }
+
+      /**
+       * Final fallback.
+       */
+
       const link =
         document.createElement(
           'a'
         );
 
-      link.href = wp.url;
-      link.download = fileName;
-      link.target = '_blank';
+      link.href =
+        wp.url;
+
+      link.download =
+        fileName;
+
+      link.target =
+        '_blank';
 
       document.body.appendChild(
         link
@@ -880,191 +1243,106 @@ export const AppProvider: React.FC<{
       );
     };
 
-    const img =
-      new Image();
-
-    img.crossOrigin =
-      'anonymous';
-
-    img.onload = () => {
-      try {
-        const canvas =
-          document.createElement(
-            'canvas'
-          );
-
-        canvas.width =
-          img.naturalWidth ||
-          1920;
-
-        canvas.height =
-          img.naturalHeight ||
-          1080;
-
-        const ctx =
-          canvas.getContext(
-            '2d'
-          );
-
-        if (ctx) {
-          ctx.drawImage(
-            img,
-            0,
-            0
-          );
-
-          canvas.toBlob(
-            (blob) => {
-              if (!blob) {
-                fallbackLink();
-                return;
-              }
-
-              const blobUrl =
-                URL.createObjectURL(
-                  blob
-                );
-
-              const link =
-                document.createElement(
-                  'a'
-                );
-
-              link.href =
-                blobUrl;
-
-              link.download =
-                fileName;
-
-              document.body.appendChild(
-                link
-              );
-
-              link.click();
-
-              document.body.removeChild(
-                link
-              );
-
-              setTimeout(() => {
-                URL.revokeObjectURL(
-                  blobUrl
-                );
-              }, 10000);
-
-              addToast(
-                `Downloaded ${wp.title} (${resolution})!`,
-                'success'
-              );
-            },
-            'image/jpeg',
-            0.95
-          );
-
-          return;
-        }
-      } catch {
-        fallbackLink();
-      }
-
-      fallbackLink();
-    };
-
-    img.onerror =
-      fallbackLink;
-
-    img.src = wp.url;
-  };
-
   /**
-   * ============================================================
+   * ==========================================================
    * COLLECTIONS
-   * ============================================================
+   * ==========================================================
    */
 
-  const createCollection = (
-    title: string,
-    description: string
-  ) => {
-    const newCol: Collection = {
-      id:
-        'ucol-' +
-        Date.now(),
+  const createCollection =
+    (
+      title: string,
+      description: string
+    ) => {
+      const newCollection: Collection =
+        {
+          id:
+            'ucol-' +
+            Date.now(),
 
-      title,
-      description,
+          title,
 
-      coverUrl:
-        'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop',
+          description,
 
-      itemCount: 0,
-      wallpaperIds: [],
+          coverUrl:
+            'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop',
+
+          itemCount: 0,
+
+          wallpaperIds: [],
+        };
+
+      setUserCollections(
+        (previous) => [
+          newCollection,
+          ...previous,
+        ]
+      );
+
+      addToast(
+        `Collection "${title}" created successfully!`,
+        'success'
+      );
     };
 
-    setUserCollections(
-      (prev) => [
-        newCol,
-        ...prev,
-      ]
-    );
+  const addToCollection =
+    (
+      collectionId: string,
+      wallpaperId: string
+    ) => {
+      setUserCollections(
+        (previous) =>
+          previous.map(
+            (
+              collection
+            ) => {
+              if (
+                collection.id !==
+                collectionId
+              ) {
+                return collection;
+              }
 
-    addToast(
-      `Collection "${title}" created successfully!`,
-      'success'
-    );
-  };
+              if (
+                collection.wallpaperIds.includes(
+                  wallpaperId
+                )
+              ) {
+                addToast(
+                  'Wallpaper is already in this collection',
+                  'info'
+                );
 
-  const addToCollection = (
-    collectionId: string,
-    wallpaperId: string
-  ) => {
-    setUserCollections(
-      (prev) =>
-        prev.map((col) => {
-          if (
-            col.id !==
-            collectionId
-          ) {
-            return col;
-          }
+                return collection;
+              }
 
-          if (
-            col.wallpaperIds.includes(
-              wallpaperId
-            )
-          ) {
-            addToast(
-              'Wallpaper is already in this collection',
-              'info'
-            );
+              addToast(
+                `Added to collection "${collection.title}"`,
+                'success'
+              );
 
-            return col;
-          }
+              return {
+                ...collection,
 
-          addToast(
-            `Added to collection "${col.title}"`,
-            'success'
-          );
+                itemCount:
+                  collection.itemCount +
+                  1,
 
-          return {
-            ...col,
-
-            itemCount:
-              col.itemCount + 1,
-
-            wallpaperIds: [
-              ...col.wallpaperIds,
-              wallpaperId,
-            ],
-          };
-        })
-    );
-  };
+                wallpaperIds:
+                  [
+                    ...collection.wallpaperIds,
+                    wallpaperId,
+                  ],
+              };
+            }
+          )
+      );
+    };
 
   /**
-   * ============================================================
-   * ADMIN: FILE UPLOAD
-   * ============================================================
+   * ==========================================================
+   * ADMIN FILE UPLOAD
+   * ==========================================================
    */
 
   const uploadWallpaperWithFile =
@@ -1081,20 +1359,23 @@ export const AppProvider: React.FC<{
         | 'thumbnailUrl'
       >
     ) => {
-      if (!requireAdmin()) {
-        return;
-      }
+      /**
+       * First check React's admin state.
+       */
 
-      if (
-        !isSupabaseConfigured()
-      ) {
+      if (!isAdmin) {
         addToast(
-          'Supabase is not configured. Uploads are disabled.',
+          'Admin access required to upload wallpapers.',
           'error'
         );
 
         return;
       }
+
+      /**
+       * Then the Supabase function itself
+       * checks the real authenticated UID.
+       */
 
       addToast(
         'Uploading wallpaper image...',
@@ -1111,110 +1392,122 @@ export const AppProvider: React.FC<{
           );
 
         setWallpapers(
-          (prev) => [
+          (previous) => [
             created,
-            ...prev,
+            ...previous,
           ]
         );
 
         addToast(
-          `Uploaded & published "${created.title}"!`,
+          `Uploaded & published "${created.title}" successfully!`,
           'success'
         );
-      } catch (err: any) {
+      } catch (
+        error: any
+      ) {
         console.error(
-          'Admin upload failed:',
-          err
+          'Wallpaper upload failed:',
+          error
         );
 
         addToast(
-          err?.message ||
-            'Upload failed. Make sure you are the administrator and Storage policies are configured.',
+          error?.message ||
+            'Wallpaper upload failed.',
           'error'
         );
 
-        throw err;
+        /**
+         * IMPORTANT:
+         *
+         * There is NO Data URL fallback.
+         *
+         * This prevents giant images from
+         * being stored in localStorage.
+         */
       }
     };
 
   /**
-   * ============================================================
-   * ADMIN: ADD WALLPAPER URL
-   * ============================================================
+   * ==========================================================
+   * ADD WALLPAPER FROM URL
+   * ADMIN ONLY
+   * ==========================================================
    */
 
-  const addWallpaper = async (
-    newWp: Omit<
-      Wallpaper,
-      | 'id'
-      | 'views'
-      | 'downloads'
-      | 'favorites'
-      | 'uploadDate'
-    >
-  ) => {
-    if (!requireAdmin()) {
-      return;
-    }
-
-    if (
-      !isSupabaseConfigured()
-    ) {
-      addToast(
-        'Supabase is not configured. Publishing is disabled.',
-        'error'
-      );
-
-      return;
-    }
-
-    try {
-      addToast(
-        'Saving wallpaper to Supabase...',
-        'info'
-      );
-
-      const created =
-        await insertWallpaperToSupabase(
-          newWp
+  const addWallpaper =
+    async (
+      newWp: Omit<
+        Wallpaper,
+        | 'id'
+        | 'views'
+        | 'downloads'
+        | 'favorites'
+        | 'uploadDate'
+      >
+    ) => {
+      if (!isAdmin) {
+        addToast(
+          'Admin access required to publish wallpapers.',
+          'error'
         );
 
-      setWallpapers(
-        (prev) => [
-          created,
-          ...prev,
-        ]
-      );
+        return;
+      }
 
-      addToast(
-        `Wallpaper "${created.title}" published!`,
-        'success'
-      );
-    } catch (err: any) {
-      console.error(
-        'Admin publish failed:',
-        err
-      );
+      try {
+        addToast(
+          'Saving wallpaper to Supabase...',
+          'info'
+        );
 
-      addToast(
-        err?.message ||
-          'Could not publish wallpaper.',
-        'error'
-      );
+        const created =
+          await insertWallpaperToSupabase(
+            newWp
+          );
 
-      throw err;
-    }
-  };
+        setWallpapers(
+          (previous) => [
+            created,
+            ...previous,
+          ]
+        );
+
+        addToast(
+          `Wallpaper "${created.title}" published successfully!`,
+          'success'
+        );
+      } catch (
+        error: any
+      ) {
+        console.error(
+          'Wallpaper insert failed:',
+          error
+        );
+
+        addToast(
+          error?.message ||
+            'Could not publish wallpaper.',
+          'error'
+        );
+      }
+    };
 
   /**
-   * ============================================================
-   * ADMIN: DELETE WALLPAPER
-   * ============================================================
+   * ==========================================================
+   * DELETE WALLPAPER
+   * ==========================================================
    */
 
   const deleteWallpaper =
-    async (id: string) => {
-      if (!requireAdmin()) {
+    async (
+      id: string
+    ) => {
+      if (!isAdmin) {
+        addToast(
+          'Admin access required to delete wallpapers.',
+          'error'
+        );
+
         return;
       }
 
@@ -1224,10 +1517,11 @@ export const AppProvider: React.FC<{
         );
 
         setWallpapers(
-          (prev) =>
-            prev.filter(
-              (w) =>
-                w.id !== id
+          (previous) =>
+            previous.filter(
+              (wallpaper) =>
+                wallpaper.id !==
+                id
             )
         );
 
@@ -1241,71 +1535,88 @@ export const AppProvider: React.FC<{
         }
 
         addToast(
-          'Wallpaper removed.',
-          'success'
+          'Wallpaper removed successfully.',
+          'info'
         );
-      } catch (err: any) {
+      } catch (
+        error: any
+      ) {
         console.error(
-          'Delete failed:',
-          err
+          'Could not delete wallpaper:',
+          error
         );
 
         addToast(
-          err?.message ||
-            'Could not delete wallpaper. You may not have permission.',
+          error?.message ||
+            'Could not delete wallpaper.',
           'error'
         );
-
-        throw err;
       }
     };
 
   /**
-   * ============================================================
-   * ADMIN: EDIT WALLPAPER
-   * ============================================================
-   *
-   * This updates the local UI.
-   *
-   * For permanent database editing, your supabase.ts should
-   * also contain an updateWallpaper function.
+   * ==========================================================
+   * EDIT WALLPAPER
+   * ==========================================================
    */
 
-  const editWallpaper = (
-    id: string,
-    updated: Partial<Wallpaper>
-  ) => {
-    if (!requireAdmin()) {
-      return;
-    }
+  const editWallpaper =
+    (
+      id: string,
+      updated: Partial<Wallpaper>
+    ) => {
+      if (!isAdmin) {
+        addToast(
+          'Admin access required to edit wallpapers.',
+          'error'
+        );
 
-    setWallpapers(
-      (prev) =>
-        prev.map((w) =>
-          w.id === id
-            ? {
-                ...w,
-                ...updated,
-              }
-            : w
-        )
-    );
+        return;
+      }
 
-    addToast(
-      'Wallpaper details updated.',
-      'success'
-    );
-  };
+      /**
+       * This updates the local UI only.
+       *
+       * If your AdminDashboard currently
+       * needs persistent metadata editing,
+       * we can add the Supabase UPDATE call
+       * next.
+       */
+
+      setWallpapers(
+        (previous) =>
+          previous.map(
+            (wallpaper) =>
+              wallpaper.id ===
+              id
+                ? {
+                    ...wallpaper,
+                    ...updated,
+                  }
+                : wallpaper
+          )
+      );
+
+      addToast(
+        'Wallpaper details updated.',
+        'success'
+      );
+    };
 
   /**
-   * ============================================================
-   * ADMIN: SEED DATABASE
-   * ============================================================
+   * ==========================================================
+   * SEED DATABASE
+   * ==========================================================
    */
 
   const seedSupabaseDatabase =
     async () => {
-      if (!requireAdmin()) {
+      if (!isAdmin) {
+        addToast(
+          'Admin access required to seed the database.',
+          'error'
+        );
+
         return;
       }
 
@@ -1322,7 +1633,7 @@ export const AppProvider: React.FC<{
 
       try {
         addToast(
-          'Seeding wallpapers table...',
+          'Seeding wallpapers table in Supabase...',
           'info'
         );
 
@@ -1333,7 +1644,8 @@ export const AppProvider: React.FC<{
 
         if (
           seeded &&
-          seeded.length > 0
+          seeded.length >
+            0
         ) {
           setWallpapers(
             seeded
@@ -1344,134 +1656,176 @@ export const AppProvider: React.FC<{
           );
 
           addToast(
-            `Successfully seeded ${seeded.length} wallpapers!`,
+            `Successfully seeded ${seeded.length} wallpapers into Supabase!`,
             'success'
           );
         } else {
           await refetchWallpapers();
         }
-      } catch (err: any) {
+      } catch (
+        error: any
+      ) {
         console.error(
           'Seeding failed:',
-          err
+          error
         );
 
         addToast(
-          err?.message ||
-            'Seeding failed.',
+          error?.message ||
+            'Database seeding failed.',
           'error'
         );
-
-        throw err;
       }
     };
 
   /**
-   * ============================================================
+   * ==========================================================
    * FILTERS
-   * ============================================================
+   * ==========================================================
    */
 
-  const resetFilters = () => {
-    setFilters(
-      defaultFilters
-    );
+  const resetFilters =
+    () => {
+      setFilters(
+        defaultFilters
+      );
 
-    setSelectedCategory(
-      'All'
-    );
-  };
+      setSelectedCategory(
+        'All'
+      );
+    };
 
-  const triggerSearch = (
-    query: string
-  ) => {
-    setFilters((prev) => ({
-      ...prev,
-      searchQuery: query,
-    }));
+  const triggerSearch =
+    (
+      query: string
+    ) => {
+      setFilters(
+        (previous) => ({
+          ...previous,
 
-    setActivePage(
-      'search'
-    );
-  };
+          searchQuery:
+            query,
+        })
+      );
+
+      setActivePage(
+        'search'
+      );
+    };
 
   /**
-   * ============================================================
-   * PROVIDER
-   * ============================================================
+   * ==========================================================
+   * CONTEXT
+   * ==========================================================
    */
 
   return (
     <AppContext.Provider
       value={{
         theme,
+
         toggleTheme,
+
         setTheme,
 
         resetToDefaultWallpapers,
 
         wallpapers,
+
         isLoadingWallpapers,
+
         wallpaperError,
+
         isSupabaseConnected,
 
         curatedCollections,
+
         userCollections,
 
         activePage,
+
         setActivePage,
 
         selectedCategory,
+
         setSelectedCategory,
 
         selectedCollectionId,
+
         setSelectedCollectionId,
 
         activeWallpaper,
+
         setActiveWallpaper,
 
         filters,
+
         setFilters,
 
         user,
+
         setUser,
 
+        isAdmin,
+
+        isAdminMode,
+
+        setAdminMode,
+
+        toggleAdminMode,
+
         toggleFavorite,
+
         downloadWallpaper,
 
         createCollection,
+
         addToCollection,
 
         addWallpaper,
+
         uploadWallpaperWithFile,
 
         deleteWallpaper,
+
         editWallpaper,
 
         toasts,
+
         addToast,
+
         removeToast,
 
         resetFilters,
+
         triggerSearch,
 
         seedSupabaseDatabase,
+
         refetchWallpapers,
       }}
     >
       {children}
 
       <AdModal
-        isOpen={isAdModalOpen}
-        onClose={() =>
-          setIsAdModalOpen(false)
+        isOpen={
+          isAdModalOpen
         }
+
+        onClose={() =>
+          setIsAdModalOpen(
+            false
+          )
+        }
+
         wallpaper={
           adModalWallpaper
         }
+
         resolution={
           adModalResolution
         }
+
         onAdComplete={() => {
           if (
             adModalWallpaper
@@ -1482,21 +1836,28 @@ export const AppProvider: React.FC<{
               true
             );
           }
+
+          setIsAdModalOpen(
+            false
+          );
         }}
       />
     </AppContext.Provider>
   );
 };
 
-export const useApp = () => {
-  const context =
-    useContext(AppContext);
+export const useApp =
+  () => {
+    const context =
+      useContext(
+        AppContext
+      );
 
-  if (!context) {
-    throw new Error(
-      'useApp must be used within an AppProvider'
-    );
-  }
+    if (!context) {
+      throw new Error(
+        'useApp must be used within an AppProvider'
+      );
+    }
 
-  return context;
-};
+    return context;
+  };
