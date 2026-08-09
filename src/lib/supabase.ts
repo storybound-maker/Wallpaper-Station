@@ -92,12 +92,17 @@ export const getSupabaseClient = (): SupabaseClient | null => {
   return clientInstance;
 };
 
-export const resetSupabaseClientInstance = () => {
+export const resetSupabaseClientInstance = (): void => {
   clientInstance = null;
 };
 
-export const supabase: SupabaseClient | null =
-  getSupabaseClient();
+/*
+ * Do not create the client until it is actually needed.
+ * This prevents configuration problems during Vercel builds.
+ */
+export const getSupabase = (): SupabaseClient | null => {
+  return getSupabaseClient();
+};
 
 /* ============================================================
    AUTH
@@ -155,7 +160,7 @@ export const signUpWithEmail = async (
   });
 };
 
-export const signOutUser = async () => {
+export const signOutUser = async (): Promise<void> => {
   const client = getSupabaseClient();
 
   if (!client) {
@@ -561,6 +566,12 @@ export async function uploadWallpaperFileAndSave({
         8
       );
 
+  /*
+   * Use string concatenation instead of
+   * template literals to avoid the syntax
+   * problem that previously appeared in Vercel.
+   */
+
   const fileName =
     String(Date.now()) +
     '-' +
@@ -574,6 +585,8 @@ export async function uploadWallpaperFileAndSave({
     'wallpapers/' +
     fileName;
 
+  /* Upload */
+
   const uploadResult =
     await client.storage
       .from(bucketName)
@@ -581,8 +594,7 @@ export async function uploadWallpaperFileAndSave({
         filePath,
         file,
         {
-          cacheControl:
-            '3600',
+          cacheControl: '3600',
           upsert: false,
           contentType:
             file.type ||
@@ -602,6 +614,8 @@ export async function uploadWallpaperFileAndSave({
     );
   }
 
+  /* Public URL */
+
   const publicResult =
     client.storage
       .from(bucketName)
@@ -619,12 +633,13 @@ export async function uploadWallpaperFileAndSave({
     );
   }
 
+  /* Database payload */
+
   const dbPayload =
     mapWallpaperToDbPayload({
       ...metadata,
 
-      url:
-        publicUrl,
+      url: publicUrl,
 
       thumbnailUrl:
         publicUrl,
@@ -640,6 +655,8 @@ export async function uploadWallpaperFileAndSave({
           .toISOString()
           .split('T')[0],
     });
+
+  /* Insert database record */
 
   const insertResult =
     await client
@@ -809,17 +826,27 @@ export async function incrementStatsInSupabase(
         0
     );
 
-  await client
-    .from('wallpapers')
-    .update({
-      [field]:
-        currentValue +
-        incrementBy,
-    })
-    .eq(
-      'id',
-      id
+  const updateData = {
+    [field]:
+      currentValue +
+      incrementBy,
+  };
+
+  const updateResult =
+    await client
+      .from('wallpapers')
+      .update(updateData)
+      .eq(
+        'id',
+        id
+      );
+
+  if (updateResult.error) {
+    console.error(
+      'Supabase stats update error:',
+      updateResult.error
     );
+  }
 }
 
 /* ============================================================
