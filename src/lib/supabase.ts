@@ -1,13 +1,3 @@
-export const isSupabaseConfigured = (): boolean => {
-  const config = getSupabaseConfig();
-
-  return Boolean(
-    config.url &&
-      config.key &&
-      config.url.startsWith('https://') &&
-      config.key.length > 20
-  );
-};
 ```tsx
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
