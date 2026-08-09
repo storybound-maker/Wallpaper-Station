@@ -15,6 +15,7 @@ import {
   uploadWallpaperFileAndSave,
   insertWallpaperToSupabase,
   deleteWallpaperFromSupabase,
+  updateWallpaperInSupabase,
   incrementStatsInSupabase,
   seedInitialWallpapersToSupabase
 } from '../lib/supabase';
@@ -75,7 +76,7 @@ interface AppContextType {
     metadata: Omit<Wallpaper, 'id' | 'views' | 'downloads' | 'favorites' | 'uploadDate' | 'url' | 'thumbnailUrl'>
   ) => Promise<void>;
   deleteWallpaper: (id: string) => Promise<void>;
-  editWallpaper: (id: string, updated: Partial<Wallpaper>) => void;
+  editWallpaper: (id: string, updated: Partial<Wallpaper>) => Promise<void>;
   toasts: ToastMessage[];
   addToast: (message: string, type?: 'success' | 'info' | 'error') => void;
   removeToast: (id: string) => void;
@@ -598,15 +599,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const editWallpaper = (id: string, updated: Partial<Wallpaper>) => {
+  const editWallpaper = async (id: string, updated: Partial<Wallpaper>) => {
     if (!user.isAdmin) {
-      addToast('Only the administrator UID can edit wallpapers.', 'error');
-      return;
+      const error = new Error('Unauthorized: Administrator access required.');
+      addToast(error.message, 'error');
+      throw error;
     }
-    setWallpapers((prev) =>
-      prev.map((w) => (w.id === id ? { ...w, ...updated } : w))
-    );
-    addToast('Wallpaper details updated', 'success');
+
+    if (!isSupabaseConfigured()) {
+      const error = new Error('Supabase is not configured. Wallpaper edits cannot be saved.');
+      addToast(error.message, 'error');
+      throw error;
+    }
+
+    try {
+      addToast('Saving wallpaper changes to Supabase...', 'info');
+
+      const savedWallpaper = await updateWallpaperInSupabase(id, updated);
+
+      setWallpapers((prev) =>
+        prev.map((w) => (w.id === id ? savedWallpaper : w))
+      );
+
+      setActiveWallpaper((current) =>
+        current?.id === id ? savedWallpaper : current
+      );
+
+      addToast('Wallpaper details saved successfully!', 'success');
+    } catch (err: any) {
+      console.error('Supabase wallpaper update failed:', err);
+      const error = err instanceof Error
+        ? err
+        : new Error(err?.message || 'Wallpaper update failed.');
+      addToast(`Edit failed: ${error.message}`, 'error');
+      throw error;
+    }
   };
 
   const seedSupabaseDatabase = async () => {
