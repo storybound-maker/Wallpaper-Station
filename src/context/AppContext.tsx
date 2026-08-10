@@ -366,10 +366,10 @@ export const AppProvider: React.FC<{
         : 'Guest User'),
     email: authUser?.email || '',
     avatar:
-      authUser?.user_metadata?.avatar_url ||
-      `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
-        authUser?.email || 'guest'
-      )}`,
+  authUser?.user_metadata?.avatar_url ||
+  `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
+    authUser?.email || 'guest'
+  )}`,
     isLoggedIn: Boolean(authUser),
     isAdmin: isAdmin,
     favoriteIds,
