@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Search,
   Heart,
   Grid,
   TrendingUp,
@@ -33,8 +32,6 @@ export const Navbar: React.FC = () => {
     setActivePage,
     user,
     signOut,
-    triggerSearch,
-    filters,
     theme,
     toggleTheme,
   } = useApp();
@@ -45,20 +42,6 @@ export const Navbar: React.FC = () => {
   const [joinModalOpen, setJoinModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] =
     useState<'signin' | 'signup'>('signin');
-  const [quickSearch, setQuickSearch] = useState(
-    filters.searchQuery
-  );
-
-  const handleQuickSearchSubmit = (
-    e: React.FormEvent
-  ) => {
-    e.preventDefault();
-
-    if (quickSearch.trim()) {
-      triggerSearch(quickSearch.trim());
-      setMobileMenuOpen(false);
-    }
-  };
 
   interface NavItem {
     id: PageView;
@@ -68,6 +51,11 @@ export const Navbar: React.FC = () => {
     adminOnly?: boolean;
   }
 
+  /*
+   * Main navigation.
+   * These are kept visible on desktop because they are the
+   * most important sections of Wallpaper Station.
+   */
   const primaryNavItems: NavItem[] = [
     {
       id: 'home',
@@ -91,6 +79,11 @@ export const Navbar: React.FC = () => {
     },
   ];
 
+  /*
+   * Less frequently used items are grouped into More.
+   * This keeps the navbar compact and prevents the auth
+   * buttons from being pushed off-screen.
+   */
   const rawSecondaryItems: NavItem[] = [
     {
       id: 'collections',
@@ -136,25 +129,26 @@ export const Navbar: React.FC = () => {
     );
 
   /*
-   * Always explicitly choose the authentication mode
-   * before opening the modal.
+   * Open authentication modal.
    */
   const openAuthModal = (
     mode: 'signin' | 'signup'
   ) => {
     setAuthModalMode(mode);
     setJoinModalOpen(true);
+
     setProfileDropdownOpen(false);
     setMoreDropdownOpen(false);
+    setMobileMenuOpen(false);
   };
 
+  /*
+   * Fully reset the navbar authentication UI
+   * after signing out.
+   */
   const handleSignOut = async () => {
     await signOut();
 
-    /*
-     * Reset authentication UI state after logout
-     * so the next authentication attempt starts clean.
-     */
     setAuthModalMode('signin');
     setJoinModalOpen(false);
     setProfileDropdownOpen(false);
@@ -165,47 +159,41 @@ export const Navbar: React.FC = () => {
   return (
     <>
       <header className="sticky top-0 z-40 w-full glass-panel border-b border-slate-800/80 bg-[#060A13]/90 backdrop-blur-xl">
-        <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-4 lg:px-6 py-2.5 flex items-center gap-2 min-w-0">
-          {/* Brand Logo */}
+        {/* =====================================================
+            DESKTOP / MAIN NAVBAR
+        ====================================================== */}
+
+        <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-4 lg:px-5 xl:px-6 py-2 flex items-center gap-2">
+          {/* ===================================================
+              BRAND
+          ==================================================== */}
+
           <div
             onClick={() => setActivePage('home')}
-            className="flex items-center gap-2.5 cursor-pointer group shrink-0 min-w-0"
+            className="flex items-center gap-2 cursor-pointer group shrink-0"
           >
-            <div className="p-2 sm:p-2.5 rounded-2xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 text-white shadow-lg shadow-sky-500/25 group-hover:scale-110 transition-transform duration-300 shrink-0">
-              <Sparkles className="w-5 h-5 text-sky-400 group-hover:rotate-12 transition-transform duration-300" />
+            <div className="p-1.5 sm:p-2 rounded-xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 text-white shadow-lg shadow-sky-500/20 group-hover:scale-105 transition-transform duration-300">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-sky-300 group-hover:rotate-12 transition-transform duration-300" />
             </div>
 
-            <div className="min-w-0">
-              <span className="text-base sm:text-lg font-extrabold tracking-tight text-white group-hover:text-sky-400 transition-colors whitespace-nowrap">
+            <div className="hidden sm:block">
+              <span className="text-sm lg:text-base font-extrabold tracking-tight text-white group-hover:text-sky-400 transition-colors whitespace-nowrap">
                 Wallpaper Station
               </span>
 
-              <span className="hidden sm:block text-[9px] tracking-widest uppercase text-slate-400 font-medium">
+              <span className="hidden lg:block text-[8px] tracking-widest uppercase text-slate-400 font-medium">
                 4K & 8K Ultra HD
               </span>
             </div>
           </div>
 
-          {/* Compact Quick Search Input */}
-          <form
-            onSubmit={handleQuickSearchSubmit}
-            className="hidden md:flex items-center relative flex-1 min-w-0 max-w-[180px] lg:max-w-[240px] xl:max-w-xs mx-1 lg:mx-2"
-          >
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          {/* ===================================================
+              DESKTOP NAVIGATION
+              
+              Search removed completely.
+          ==================================================== */}
 
-            <input
-              type="text"
-              placeholder="Search 4K wallpapers..."
-              value={quickSearch}
-              onChange={(e) =>
-                setQuickSearch(e.target.value)
-              }
-              className="w-full min-w-0 bg-slate-900/80 text-xs text-slate-100 placeholder-slate-500 rounded-full pl-8 pr-3 py-2 border border-slate-800 focus:outline-none focus:border-sky-500/60 focus:ring-1 focus:ring-sky-500/30 transition-all"
-            />
-          </form>
-
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center gap-1 shrink-0">
+          <nav className="hidden lg:flex items-center gap-0.5 ml-2">
             {primaryNavItems.map((item) => {
               const Icon = item.icon;
               const isActive =
@@ -217,7 +205,7 @@ export const Navbar: React.FC = () => {
                   onClick={() =>
                     setActivePage(item.id)
                   }
-                  className={`relative px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 ${
+                  className={`relative px-2 py-1.5 xl:px-2.5 rounded-lg text-[11px] xl:text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap ${
                     isActive
                       ? 'text-white bg-slate-800/90 shadow-sm'
                       : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/40'
@@ -248,7 +236,10 @@ export const Navbar: React.FC = () => {
               );
             })}
 
-            {/* More Dropdown */}
+            {/* =================================================
+                MORE DROPDOWN
+            ================================================== */}
+
             <div className="relative">
               <button
                 onClick={() =>
@@ -256,7 +247,7 @@ export const Navbar: React.FC = () => {
                     !moreDropdownOpen
                   )
                 }
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 ${
+                className={`px-2 py-1.5 xl:px-2.5 rounded-lg text-[11px] xl:text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap ${
                   isSecondaryActive ||
                   moreDropdownOpen
                     ? 'text-sky-400 bg-sky-500/10 border border-sky-500/30'
@@ -268,7 +259,7 @@ export const Navbar: React.FC = () => {
                 <span>More</span>
 
                 {user.favoriteIds.length > 0 && (
-                  <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
                 )}
 
                 <ChevronDown
@@ -286,7 +277,7 @@ export const Navbar: React.FC = () => {
                     initial={{
                       opacity: 0,
                       y: 8,
-                      scale: 0.95,
+                      scale: 0.96,
                     }}
                     animate={{
                       opacity: 1,
@@ -296,14 +287,17 @@ export const Navbar: React.FC = () => {
                     exit={{
                       opacity: 0,
                       y: 8,
-                      scale: 0.95,
+                      scale: 0.96,
                     }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 mt-2 w-48 glass-panel rounded-xl p-1.5 shadow-xl border border-slate-700/80 z-50 text-slate-200 bg-[#0B1220]/95"
+                    transition={{
+                      duration: 0.15,
+                    }}
+                    className="absolute left-0 mt-2 w-48 glass-panel rounded-xl p-1.5 shadow-xl border border-slate-700/80 z-50 text-slate-200 bg-[#0B1220]/95"
                   >
                     {secondaryNavItems.map(
                       (item) => {
                         const Icon = item.icon;
+
                         const isActive =
                           activePage ===
                           item.id;
@@ -315,6 +309,7 @@ export const Navbar: React.FC = () => {
                               setActivePage(
                                 item.id
                               );
+
                               setMoreDropdownOpen(
                                 false
                               );
@@ -354,9 +349,18 @@ export const Navbar: React.FC = () => {
             </div>
           </nav>
 
-          {/* Right Actions */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
-            {/* Theme Toggle */}
+          {/* ===================================================
+              RIGHT SIDE ACTIONS
+
+              ml-auto pushes these to the far right.
+              min-width is avoided so they cannot get clipped.
+          ==================================================== */}
+
+          <div className="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0">
+            {/* =================================================
+                THEME
+            ================================================== */}
+
             <button
               onClick={toggleTheme}
               title={
@@ -364,36 +368,29 @@ export const Navbar: React.FC = () => {
                   ? 'Switch to Day Mode'
                   : 'Switch to Night Mode'
               }
-              className={`p-2 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-bold border transition-all duration-300 flex items-center gap-1.5 shadow-sm shrink-0 ${
+              className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl border transition-all duration-300 flex items-center justify-center shrink-0 ${
                 theme === 'dark'
                   ? 'bg-slate-900/90 border-slate-700/80 text-amber-400 hover:bg-slate-800 hover:border-amber-400/50'
                   : 'bg-white border-slate-200 text-sky-600 hover:bg-slate-50 hover:border-sky-400'
               }`}
             >
               {theme === 'dark' ? (
-                <>
-                  <Sun className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="hidden xl:inline">
-                    Day
-                  </span>
-                </>
+                <Sun className="w-3.5 h-3.5" />
               ) : (
-                <>
-                  <Moon className="w-3.5 h-3.5 text-sky-600" />
-                  <span className="hidden xl:inline">
-                    Night
-                  </span>
-                </>
+                <Moon className="w-3.5 h-3.5" />
               )}
             </button>
 
-            {/* Admin Suite */}
+            {/* =================================================
+                ADMIN
+            ================================================== */}
+
             {user.isAdmin && (
               <button
                 onClick={() =>
                   setActivePage('admin')
                 }
-                className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-200 shrink-0 ${
+                className={`hidden md:flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold border transition-all duration-200 shrink-0 ${
                   activePage === 'admin'
                     ? 'bg-sky-500/20 text-sky-400 border-sky-500/40'
                     : 'bg-slate-900/60 text-slate-300 border-slate-800 hover:border-slate-700 hover:bg-slate-800/60'
@@ -402,30 +399,35 @@ export const Navbar: React.FC = () => {
                 <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
 
                 <span className="hidden xl:inline">
-                  Admin Suite
+                  Admin
                 </span>
               </button>
             )}
 
-            {/* Authentication Buttons */}
+            {/* =================================================
+                LOGGED OUT AUTH BUTTONS
+            ================================================== */}
+
             {!user.isLoggedIn ? (
               <div className="flex items-center gap-1 shrink-0">
+                {/* Sign In is ALWAYS visible */}
                 <button
                   onClick={() =>
                     openAuthModal('signin')
                   }
-                  className="flex items-center justify-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 transition-all shrink-0 whitespace-nowrap"
+                  className="flex items-center justify-center gap-1 px-2 py-1.5 sm:px-2.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 transition-all whitespace-nowrap shrink-0"
                 >
                   <LogIn className="w-3.5 h-3.5 text-sky-400 shrink-0" />
 
                   <span>Sign In</span>
                 </button>
 
+                {/* Sign Up */}
                 <button
                   onClick={() =>
                     openAuthModal('signup')
                   }
-                  className="hidden sm:flex items-center justify-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-md shadow-sky-500/20 transition-all shrink-0 whitespace-nowrap"
+                  className="hidden sm:flex items-center justify-center gap-1 px-2 py-1.5 sm:px-2.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-md shadow-sky-500/20 transition-all whitespace-nowrap shrink-0"
                 >
                   <UserPlus className="w-3.5 h-3.5 shrink-0" />
 
@@ -433,7 +435,10 @@ export const Navbar: React.FC = () => {
                 </button>
               </div>
             ) : (
-              /* User Profile Menu */
+              /* =================================================
+                 LOGGED IN PROFILE
+              ================================================== */
+
               <div className="relative shrink-0">
                 <button
                   onClick={() =>
@@ -508,6 +513,7 @@ export const Navbar: React.FC = () => {
                             setActivePage(
                               'profile'
                             );
+
                             setProfileDropdownOpen(
                               false
                             );
@@ -526,6 +532,7 @@ export const Navbar: React.FC = () => {
                             setActivePage(
                               'favorites'
                             );
+
                             setProfileDropdownOpen(
                               false
                             );
@@ -550,6 +557,7 @@ export const Navbar: React.FC = () => {
                               setActivePage(
                                 'admin'
                               );
+
                               setProfileDropdownOpen(
                                 false
                               );
@@ -566,9 +574,7 @@ export const Navbar: React.FC = () => {
                         )}
 
                         <button
-                          onClick={() =>
-                            toggleTheme()
-                          }
+                          onClick={toggleTheme}
                           className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs text-amber-400 hover:bg-amber-500/10 transition-colors"
                         >
                           {theme === 'dark' ? (
@@ -605,14 +611,17 @@ export const Navbar: React.FC = () => {
               </div>
             )}
 
-            {/* Mobile Menu Toggle */}
+            {/* =================================================
+                MOBILE MENU
+            ================================================== */}
+
             <button
               onClick={() =>
                 setMobileMenuOpen(
                   !mobileMenuOpen
                 )
               }
-              className="lg:hidden p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white shrink-0"
+              className="lg:hidden p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white shrink-0"
             >
               {mobileMenuOpen ? (
                 <X className="w-5 h-5" />
@@ -623,7 +632,10 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Drawer Navigation */}
+        {/* =====================================================
+            MOBILE DRAWER
+        ====================================================== */}
+
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div
@@ -642,31 +654,12 @@ export const Navbar: React.FC = () => {
               transition={{ duration: 0.2 }}
               className="lg:hidden glass-panel border-t border-slate-800 px-4 py-5 space-y-4"
             >
-              {/* Mobile Search */}
-              <form
-                onSubmit={
-                  handleQuickSearchSubmit
-                }
-                className="flex items-center relative"
-              >
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-
-                <input
-                  type="text"
-                  placeholder="Search wallpapers..."
-                  value={quickSearch}
-                  onChange={(e) =>
-                    setQuickSearch(
-                      e.target.value
-                    )
-                  }
-                  className="w-full bg-slate-900 text-xs text-slate-100 placeholder-slate-500 rounded-xl pl-10 pr-4 py-2.5 border border-slate-800 focus:outline-none focus:border-sky-500"
-                />
-              </form>
+              {/* Mobile Navigation */}
 
               <div className="grid grid-cols-2 gap-2">
                 {allNavItems.map((item) => {
                   const Icon = item.icon;
+
                   const isActive =
                     activePage === item.id;
 
@@ -677,6 +670,7 @@ export const Navbar: React.FC = () => {
                         setActivePage(
                           item.id
                         );
+
                         setMobileMenuOpen(
                           false
                         );
@@ -695,19 +689,18 @@ export const Navbar: React.FC = () => {
                 })}
               </div>
 
-              <div className="pt-2 border-t border-slate-800 flex justify-between items-center">
+              {/* Mobile Authentication */}
+
+              <div className="pt-2 border-t border-slate-800">
                 {!user.isLoggedIn ? (
-                  <div className="flex items-center gap-2 w-full justify-between">
+                  <div className="flex items-center justify-between w-full">
                     <button
-                      onClick={() => {
+                      onClick={() =>
                         openAuthModal(
                           'signin'
-                        );
-                        setMobileMenuOpen(
-                          false
-                        );
-                      }}
-                      className="flex items-center gap-2 text-xs font-semibold text-sky-400"
+                        )
+                      }
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900 text-xs font-semibold text-sky-400 border border-slate-800"
                     >
                       <LogIn className="w-4 h-4" />
 
@@ -715,15 +708,12 @@ export const Navbar: React.FC = () => {
                     </button>
 
                     <button
-                      onClick={() => {
+                      onClick={() =>
                         openAuthModal(
                           'signup'
-                        );
-                        setMobileMenuOpen(
-                          false
-                        );
-                      }}
-                      className="flex items-center gap-2 text-xs font-semibold text-indigo-400"
+                        )
+                      }
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-500/10 text-xs font-semibold text-indigo-400 border border-sky-500/20"
                     >
                       <UserPlus className="w-4 h-4" />
 
@@ -742,7 +732,7 @@ export const Navbar: React.FC = () => {
                       onClick={
                         handleSignOut
                       }
-                      className="flex items-center gap-1.5 text-xs font-semibold text-rose-400"
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/10"
                     >
                       <LogOut className="w-3.5 h-3.5" />
 
@@ -756,7 +746,10 @@ export const Navbar: React.FC = () => {
         </AnimatePresence>
       </header>
 
-      {/* Authentication Modal */}
+      {/* =======================================================
+          AUTHENTICATION MODAL
+      ======================================================== */}
+
       <JoinModal
         isOpen={joinModalOpen}
         onClose={() =>
