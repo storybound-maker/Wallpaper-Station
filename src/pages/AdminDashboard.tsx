@@ -12,7 +12,10 @@ import {
   HardDrive,
   Loader2,
   Lock,
-  ShieldAlert
+  ShieldAlert,
+  Pencil,
+  Save,
+  X
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { CategoryName, OrientationType, ResolutionOption, Wallpaper } from '../types';
@@ -25,6 +28,7 @@ export const AdminDashboard: React.FC = () => {
     wallpapers,
     addWallpaper,
     uploadWallpaperWithFile,
+    editWallpaper,
     deleteWallpaper,
     addToast,
     user
@@ -51,6 +55,55 @@ export const AdminDashboard: React.FC = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Editing State
+  const [editingWallpaper, setEditingWallpaper] = useState<Wallpaper | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editCategory, setEditCategory] = useState<CategoryName>('Cyberpunk');
+  const [editResolutionTag, setEditResolutionTag] = useState<ResolutionOption>('4K');
+  const [editOrientation, setEditOrientation] = useState<OrientationType>('landscape');
+  const [editAuthorName, setEditAuthorName] = useState('');
+  const [editTags, setEditTags] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const handleEditClick = (wp: Wallpaper) => {
+    setEditingWallpaper(wp);
+    setEditTitle(wp.title);
+    setEditDescription(wp.description || '');
+    setEditCategory(wp.category);
+    setEditResolutionTag(wp.resolutionTag);
+    setEditOrientation(wp.orientation);
+    setEditAuthorName(wp.author?.name || '');
+    setEditTags(Array.isArray(wp.tags) ? wp.tags.join(', ') : '');
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingWallpaper) return;
+
+    setIsSavingEdit(true);
+    try {
+      const parsedTags = editTags.split(',').map((t) => t.trim()).filter(Boolean);
+      await editWallpaper(editingWallpaper.id, {
+        title: editTitle,
+        description: editDescription,
+        category: editCategory,
+        resolutionTag: editResolutionTag,
+        orientation: editOrientation,
+        tags: parsedTags,
+        author: {
+          name: editAuthorName || 'Station Creator',
+          avatar: editingWallpaper.author?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop',
+        },
+      });
+      setEditingWallpaper(null);
+    } catch (err) {
+      console.error('Error updating wallpaper:', err);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
 
   // Analytics totals
   const totalDownloads = wallpapers.reduce((acc, wp) => acc + (wp.downloads || 0), 0);
@@ -483,6 +536,14 @@ export const AdminDashboard: React.FC = () => {
                 </div>
 
                 <button
+                  onClick={() => handleEditClick(wp)}
+                  className="p-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 transition-colors"
+                  title="Edit wallpaper metadata"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+
+                <button
                   onClick={() => deleteWallpaper(wp.id)}
                   className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-colors"
                   title="Delete wallpaper"
@@ -494,6 +555,134 @@ export const AdminDashboard: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* Admin Edit Wallpaper Modal */}
+      {editingWallpaper && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div
+            className="fixed inset-0 bg-[#060A13]/85 backdrop-blur-md"
+            onClick={() => setEditingWallpaper(null)}
+          />
+          <div className="relative w-full max-w-2xl glass-panel rounded-3xl border border-slate-700/80 shadow-2xl p-6 sm:p-8 z-10 bg-[#0B1220] text-slate-100 space-y-5 my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Pencil className="w-5 h-5 text-sky-400" />
+                <span>Edit Wallpaper Metadata</span>
+              </h3>
+              <button
+                onClick={() => setEditingWallpaper(null)}
+                className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1.5">Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1.5">Category *</label>
+                  <select
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value as CategoryName)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
+                  >
+                    {CATEGORIES_DATA.map((cat) => (
+                      <option key={cat.name} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1.5">Description</label>
+                  <textarea
+                    rows={2}
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1.5">Resolution Tag</label>
+                  <select
+                    value={editResolutionTag}
+                    onChange={(e) => setEditResolutionTag(e.target.value as ResolutionOption)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
+                  >
+                    <option value="4K">4K</option>
+                    <option value="8K">8K</option>
+                    <option value="1440p">1440p</option>
+                    <option value="1080p">1080p</option>
+                    <option value="Mobile">Mobile</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1.5">Orientation</label>
+                  <select
+                    value={editOrientation}
+                    onChange={(e) => setEditOrientation(e.target.value as OrientationType)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
+                  >
+                    <option value="landscape">Landscape</option>
+                    <option value="portrait">Portrait</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1.5">Author Name</label>
+                  <input
+                    type="text"
+                    value={editAuthorName}
+                    onChange={(e) => setEditAuthorName(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1.5">Tags (Comma Separated)</label>
+                  <input
+                    type="text"
+                    value={editTags}
+                    onChange={(e) => setEditTags(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingWallpaper(null)}
+                  className="px-5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold text-slate-300 hover:text-white"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="px-6 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white text-xs font-bold shadow-lg shadow-sky-500/20 flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isSavingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  <span>{isSavingEdit ? 'Saving Changes...' : 'Save Changes to Supabase'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
