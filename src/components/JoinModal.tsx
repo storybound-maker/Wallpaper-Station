@@ -1,6 +1,12 @@
 ```tsx
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, {
+  useEffect,
+  useState,
+} from 'react';
+import {
+  motion,
+  AnimatePresence,
+} from 'motion/react';
 import {
   X,
   Lock,
@@ -21,7 +27,9 @@ interface JoinModalProps {
   initialMode?: 'signin' | 'signup' | 'forgot';
 }
 
-export const JoinModal: React.FC<JoinModalProps> = ({
+export const JoinModal: React.FC<
+  JoinModalProps
+> = ({
   isOpen,
   onClose,
   initialMode = 'signin',
@@ -31,15 +39,12 @@ export const JoinModal: React.FC<JoinModalProps> = ({
     signInWithGoogle,
     signUp,
     resetPassword,
-    addToast,
-    user,
   } = useApp();
 
   const [mode, setMode] = useState<
     'signin' | 'signup' | 'forgot'
   >(initialMode);
 
-  // Form Fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] =
@@ -51,7 +56,21 @@ export const JoinModal: React.FC<JoinModalProps> = ({
   const [authError, setAuthError] =
     useState<string | null>(null);
 
-  if (!isOpen) return null;
+  /*
+   * Reset the modal whenever it opens.
+   *
+   * This prevents the modal from remembering
+   * "Create Account" or "Forgot Password" from
+   * the previous session.
+   */
+  useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode || 'signin');
+      setAuthError(null);
+      setPassword('');
+      setIsSubmitting(false);
+    }
+  }, [isOpen, initialMode]);
 
   const handleSignInSubmit = async (
     e: React.FormEvent
@@ -64,7 +83,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
       !password.trim()
     ) {
       setAuthError(
-        'Please enter both email address and password'
+        'Please enter both email address and password.'
       );
 
       return;
@@ -204,6 +223,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
             'Failed to send password reset email.'
         );
       } else {
+        setAuthError(null);
         setMode('signin');
       }
     } finally {
@@ -217,6 +237,8 @@ export const JoinModal: React.FC<JoinModalProps> = ({
     setIsSubmitting(false);
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <AnimatePresence>
@@ -261,6 +283,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
           <div className="text-center space-y-2 mb-6">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/10 text-sky-400 text-xs font-bold border border-sky-500/20 mb-1">
               <ShieldCheck className="w-3.5 h-3.5" />
+
               <span>
                 SUPABASE AUTHENTICATION
               </span>
@@ -289,10 +312,11 @@ export const JoinModal: React.FC<JoinModalProps> = ({
             </p>
           </div>
 
-          {/* Mode Switcher Pills */}
+          {/* Mode Switcher */}
           {mode !== 'forgot' && (
             <div className="flex rounded-xl bg-slate-900 p-1 border border-slate-800 text-xs font-semibold mb-6">
               <button
+                type="button"
                 onClick={() => {
                   setMode('signin');
                   setAuthError(null);
@@ -304,10 +328,12 @@ export const JoinModal: React.FC<JoinModalProps> = ({
                 }`}
               >
                 <LogIn className="w-3.5 h-3.5" />
+
                 <span>Sign In</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => {
                   setMode('signup');
                   setAuthError(null);
@@ -319,6 +345,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
                 }`}
               >
                 <UserPlus className="w-3.5 h-3.5" />
+
                 <span>
                   Create Account
                 </span>
@@ -333,7 +360,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
             </div>
           )}
 
-          {/* Mode 1: Sign In Form */}
+          {/* Sign In */}
           {mode === 'signin' && (
             <form
               onSubmit={handleSignInSubmit}
@@ -416,7 +443,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
                 </span>
               </button>
 
-              {/* Google Sign-In Divider */}
+              {/* Google Divider */}
               <div className="relative my-5">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-slate-800" />
@@ -433,7 +460,9 @@ export const JoinModal: React.FC<JoinModalProps> = ({
               <button
                 type="button"
                 disabled={isSubmitting}
-                onClick={handleGoogleSignIn}
+                onClick={
+                  handleGoogleSignIn
+                }
                 className="w-full py-3.5 px-6 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-3 disabled:opacity-50"
               >
                 <svg
@@ -468,7 +497,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
             </form>
           )}
 
-          {/* Mode 2: Sign Up Form */}
+          {/* Sign Up */}
           {mode === 'signup' && (
             <form
               onSubmit={handleSignUpSubmit}
@@ -562,7 +591,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({
             </form>
           )}
 
-          {/* Mode 3: Forgot Password Form */}
+          {/* Forgot Password */}
           {mode === 'forgot' && (
             <form
               onSubmit={handleForgotSubmit}
