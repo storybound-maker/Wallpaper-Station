@@ -20,7 +20,8 @@ import {
   Moon,
   LogIn,
   ChevronDown,
-  MoreHorizontal
+  MoreHorizontal,
+  Sparkles
 } from 'lucide-react';
 import { useApp, PageView } from '../context/AppContext';
 import { JoinModal } from './JoinModal';
@@ -93,18 +94,13 @@ export const Navbar: React.FC = () => {
       <header className="sticky top-0 z-40 w-full glass-panel border-b border-slate-800/80 bg-[#0B1220]/90 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
           
-          {/* Brand Logo with Personal Browser Icon */}
+          {/* Brand Logo */}
           <div
             onClick={() => setActivePage('home')}
             className="flex items-center gap-2.5 cursor-pointer group shrink-0"
           >
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl overflow-hidden bg-slate-900 border border-sky-500/40 p-0.5 shadow-md shadow-sky-500/20 group-hover:scale-105 transition-transform duration-300 shrink-0">
-              <img
-                src="/src/assets/images/app_logo_favicon_1786366764662.jpg"
-                alt="Wallpaper Station Logo"
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover rounded-[10px]"
-              />
+            <div className="p-2 sm:p-2.5 rounded-2xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 text-white shadow-lg shadow-sky-500/25 group-hover:scale-110 transition-transform duration-300">
+              <Sparkles className="w-5 h-5 text-sky-400 group-hover:rotate-12 transition-transform duration-300" />
             </div>
             <div>
               <span className="text-base sm:text-lg font-extrabold tracking-tight text-white group-hover:text-sky-400 transition-colors">
