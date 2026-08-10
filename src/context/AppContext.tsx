@@ -241,13 +241,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data, error } = await signInWithEmail(email, password);
       if (error) {
         addToast(error.message, 'error');
-        return { error };
+        return { error, user: null, session: null };
       }
       addToast('Signed in successfully!', 'success');
-      return { error: null };
+      return { error: null, user: data?.user || null, session: data?.session || null };
     } catch (err: any) {
       addToast(err.message || 'Sign in failed', 'error');
-      return { error: err };
+      return { error: err, user: null, session: null };
     }
   };
 
@@ -256,13 +256,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data, error } = await signUpWithEmail(email, password, name);
       if (error) {
         addToast(error.message, 'error');
-        return { error, user: null };
+        return { error, user: null, session: null };
       }
       addToast('Account created successfully!', 'success');
-      return { error: null, user: data.user };
+      return { error: null, user: data?.user || null, session: data?.session || null };
     } catch (err: any) {
       addToast(err.message || 'Sign up failed', 'error');
-      return { error: err, user: null };
+      return { error: err, user: null, session: null };
     }
   };
 

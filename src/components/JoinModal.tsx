@@ -18,13 +18,16 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, initialMo
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [signUpSuccessMsg, setSignUpSuccessMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleGoogleSignIn = async () => {
     setAuthError(null);
+    setSignUpSuccessMsg(null);
     setIsSubmitting(true);
     try {
       const { error } = await signInWithGoogle();
@@ -41,20 +44,25 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, initialMo
   const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
+    setSignUpSuccessMsg(null);
 
-    if (!email.trim() || !password.trim()) {
-      setAuthError('Please enter both email address and password');
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail || !password) {
+      setAuthError('Please enter both email address and password.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const { error } = await signIn(email.trim(), password.trim());
+      const { error } = await signIn(trimmedEmail, password);
       if (error) {
         setAuthError(error.message || 'Invalid login credentials.');
       } else {
         handleClose();
       }
+    } catch (err: any) {
+      setAuthError(err.message || 'Sign in failed. Please check your credentials.');
     } finally {
       setIsSubmitting(false);
     }
@@ -63,9 +71,23 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, initialMo
   const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
+    setSignUpSuccessMsg(null);
 
-    if (!email.trim() || !password.trim()) {
-      setAuthError('Please fill in all required fields.');
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+
+    if (!trimmedName) {
+      setAuthError('Please enter your full name.');
+      return;
+    }
+
+    if (!trimmedEmail || !trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
+      setAuthError('Please enter a valid email address.');
+      return;
+    }
+
+    if (!password) {
+      setAuthError('Please enter a password.');
       return;
     }
 
@@ -74,18 +96,31 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, initialMo
       return;
     }
 
+    if (password !== confirmPassword) {
+      setAuthError('Passwords do not match. Please verify your passwords.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const { error, user: createdUser } = await signUp(email.trim(), password.trim(), name.trim());
+      const { error, user: createdUser, session: createdSession } = await signUp(trimmedEmail, password, trimmedName);
       if (error) {
         setAuthError(error.message || 'Failed to create account.');
       } else {
         if (createdUser?.identities && createdUser.identities.length === 0) {
           setAuthError('This email is already registered. Please sign in instead.');
-        } else {
+        } else if (createdSession) {
+          // Logged in directly
           handleClose();
+        } else {
+          // Email confirmation is required by Supabase Auth configuration
+          setSignUpSuccessMsg(
+            'Account created successfully! A confirmation link has been sent to your email address. Please check your inbox and verify your email to log in.'
+          );
         }
       }
+    } catch (err: any) {
+      setAuthError(err.message || 'Failed to create account.');
     } finally {
       setIsSubmitting(false);
     }
@@ -94,6 +129,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, initialMo
   const handleForgotSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
+    setSignUpSuccessMsg(null);
 
     if (!email.trim()) {
       setAuthError('Please enter your email address.');
@@ -106,6 +142,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, initialMo
       if (error) {
         setAuthError(error.message || 'Failed to send password reset email.');
       } else {
+        setSignUpSuccessMsg('Password reset instructions sent to your email.');
         setMode('signin');
       }
     } finally {
@@ -115,7 +152,9 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, initialMo
 
   const handleClose = () => {
     setAuthError(null);
+    setSignUpSuccessMsg(null);
     setPassword('');
+    setConfirmPassword('');
     setIsSubmitting(false);
     onClose();
   };
@@ -197,6 +236,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, initialMo
                 onClick={() => {
                   setMode('signin');
                   setAuthError(null);
+                  setSignUpSuccessMsg(null);
                 }}
                 className={`flex-1 py-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                   mode === 'signin'
@@ -212,6 +252,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, initialMo
                 onClick={() => {
                   setMode('signup');
                   setAuthError(null);
+                  setSignUpSuccessMsg(null);
                 }}
                 className={`flex-1 py-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                   mode === 'signup'
@@ -221,6 +262,27 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, initialMo
               >
                 <UserPlus className="w-3.5 h-3.5" />
                 <span>Create Account</span>
+              </button>
+            </div>
+          )}
+
+          {/* Success Banner */}
+          {signUpSuccessMsg && (
+            <div className="mb-5 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs font-medium leading-relaxed space-y-2">
+              <div className="flex items-start gap-2.5">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <span>{signUpSuccessMsg}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('signin');
+                  setSignUpSuccessMsg(null);
+                  setAuthError(null);
+                }}
+                className="mt-2 w-full py-2 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs transition-colors"
+              >
+                Proceed to Sign In
               </button>
             </div>
           )}
@@ -262,6 +324,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, initialMo
                     onClick={() => {
                       setMode('forgot');
                       setAuthError(null);
+                      setSignUpSuccessMsg(null);
                     }}
                     className="text-xs text-sky-400 hover:underline font-semibold"
                   >
@@ -307,6 +370,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, initialMo
                   <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
+                    required
                     placeholder="e.g. Alex Vance"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
@@ -344,6 +408,23 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, initialMo
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1.5">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <KeyRound className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-100 focus:outline-none focus:border-sky-500"
                   />
                 </div>
